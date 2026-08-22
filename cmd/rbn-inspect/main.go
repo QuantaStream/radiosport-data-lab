@@ -32,8 +32,8 @@ func main() {
 
 	fmt.Printf("rows=%d rejected=%d skipped_footer=%d\n", stats.Rows, stats.RejectedRows, stats.SkippedFooter)
 	fmt.Printf("spotter_calls=%d dx_calls=%d\n", len(profile.spotterCalls), len(profile.dxCalls))
-	fmt.Printf("frequency_hz_min=%d frequency_hz_max=%d signal_db_min=%d signal_db_max=%d speed_wpm_min=%d speed_wpm_max=%d\n",
-		profile.minFrequencyHz, profile.maxFrequencyHz, profile.minSignalDB, profile.maxSignalDB, profile.minSpeedWPM, profile.maxSpeedWPM)
+	fmt.Printf("frequency_khz_min=%.1f frequency_khz_max=%.1f signal_db_min=%d signal_db_max=%d speed_wpm_min=%d speed_wpm_max=%d\n",
+		profile.minFrequencyKHz, profile.maxFrequencyKHz, profile.minSignalDB, profile.maxSignalDB, profile.minSpeedWPM, profile.maxSpeedWPM)
 	printTop("bands", profile.bands, 12)
 	printTop("modes", profile.modes, 12)
 	printTop("tx_modes", profile.txModes, 12)
@@ -49,8 +49,8 @@ type profile struct {
 	txModes           map[string]int
 	spotterContinents map[string]int
 	dxContinents      map[string]int
-	minFrequencyHz    int64
-	maxFrequencyHz    int64
+	minFrequencyKHz   float64
+	maxFrequencyKHz   float64
 	minSignalDB       int
 	maxSignalDB       int
 	minSpeedWPM       int
@@ -79,14 +79,14 @@ func (p *profile) observe(spot rbn.Spot) {
 	p.spotterContinents[spot.SpotterContinent]++
 	p.dxContinents[spot.DXContinent]++
 	if !p.seen {
-		p.minFrequencyHz, p.maxFrequencyHz = spot.FrequencyHz, spot.FrequencyHz
+		p.minFrequencyKHz, p.maxFrequencyKHz = spot.FrequencyKHz, spot.FrequencyKHz
 		p.minSignalDB, p.maxSignalDB = spot.SignalDB, spot.SignalDB
 		p.minSpeedWPM, p.maxSpeedWPM = spot.SpeedWPM, spot.SpeedWPM
 		p.seen = true
 		return
 	}
-	p.minFrequencyHz = min(p.minFrequencyHz, spot.FrequencyHz)
-	p.maxFrequencyHz = max(p.maxFrequencyHz, spot.FrequencyHz)
+	p.minFrequencyKHz = min(p.minFrequencyKHz, spot.FrequencyKHz)
+	p.maxFrequencyKHz = max(p.maxFrequencyKHz, spot.FrequencyKHz)
 	p.minSignalDB = min(p.minSignalDB, spot.SignalDB)
 	p.maxSignalDB = max(p.maxSignalDB, spot.SignalDB)
 	p.minSpeedWPM = min(p.minSpeedWPM, spot.SpeedWPM)

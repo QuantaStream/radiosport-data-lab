@@ -28,7 +28,7 @@ callsign parser to add prefix, continent, and band metadata.
 | `dx_call` | `dx` | `StringLexBSI length=16 maxLen=16` | Inline callsign, no KV remainder. |
 | `spotter_prefix`, `dx_prefix` | archive or parser | `StringEnum` | Low-cardinality DXCC prefix. |
 | `spotter_continent`, `dx_continent` | archive or parser | `StringEnum` | Seven possible continent-style values. |
-| `frequency_hz` | `freq * 1000` | `IntBSI` | Exact integer frequency for range predicates. |
+| `frequency_khz` | `freq` | `FloatScaleBSI`, `scale: 1` | Human-readable RBN frequency with fixed one-decimal precision for range predicates. |
 | `band`, `mode`, `transmit_mode`, `source` | archive or parser | `StringEnum` | Small enumerations. |
 | `signal_db`, `speed_wpm` | `db`, `speed` | `IntBSI` | Compact numeric ranges. |
 

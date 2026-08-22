@@ -53,10 +53,11 @@ attributes:
   mappingStrategy: StringEnum
   type: String
   sourceOrdinal: 8
-- fieldName: frequency_hz
-  sourceName: /data/frequency_hz
-  mappingStrategy: IntBSI
-  type: Integer
+- fieldName: frequency_khz
+  sourceName: /data/frequency_khz
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 1
   sourceOrdinal: 9
 - fieldName: band
   sourceName: /data/band

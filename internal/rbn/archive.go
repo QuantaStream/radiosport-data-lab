@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -119,7 +118,7 @@ func ParseArchiveRecordWithDate(record []string, archiveDate time.Time) (Spot, e
 		DXCall:           dxCall,
 		DXPrefix:         normalizeCode(record[6]),
 		DXContinent:      normalizeCode(record[7]),
-		FrequencyHz:      int64(math.Round(freqKHz * 1000)),
+		FrequencyKHz:     freqKHz,
 		Band:             strings.TrimSpace(record[4]),
 		Mode:             strings.TrimSpace(record[8]),
 		SignalDB:         signalDB,

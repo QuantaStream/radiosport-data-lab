@@ -40,7 +40,7 @@ func TestLoaderClientPostsEventsBatch(t *testing.T) {
 			DXCall:           "KC2SIZ",
 			DXPrefix:         "K",
 			DXContinent:      "NA",
-			FrequencyHz:      14054400,
+			FrequencyKHz:     14054.4,
 			Band:             "20m",
 			Mode:             "CQ",
 			SignalDB:         25,

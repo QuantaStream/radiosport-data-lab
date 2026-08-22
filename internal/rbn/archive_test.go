@@ -34,8 +34,8 @@ func TestReadArchiveCSVSkipsFooter(t *testing.T) {
 	if got, want := spots[0].DXCall, "KC2SIZ"; got != want {
 		t.Fatalf("dx = %q, want %q", got, want)
 	}
-	if got, want := spots[0].FrequencyHz, int64(14054400); got != want {
-		t.Fatalf("frequency_hz = %d, want %d", got, want)
+	if got, want := spots[0].FrequencyKHz, 14054.4; got != want {
+		t.Fatalf("frequency_khz = %.1f, want %.1f", got, want)
 	}
 	if got, want := spots[0].SpottedAt, time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Fatalf("spotted_at = %s, want %s", got, want)

@@ -15,7 +15,7 @@ func TestSpotSQLArgs(t *testing.T) {
 		DXCall:           "KC2SIZ",
 		DXPrefix:         "K",
 		DXContinent:      "NA",
-		FrequencyHz:      14054400,
+		FrequencyKHz:     14054.4,
 		Band:             "20m",
 		Mode:             "CQ",
 		SignalDB:         25,
@@ -32,5 +32,8 @@ func TestSpotSQLArgs(t *testing.T) {
 	}
 	if got, want := args[5], "KC2SIZ"; got != want {
 		t.Fatalf("dx_call arg = %v, want %v", got, want)
+	}
+	if got, want := args[8], 14054.4; got != want {
+		t.Fatalf("frequency_khz arg = %v, want %v", got, want)
 	}
 }

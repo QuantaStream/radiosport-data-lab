@@ -34,6 +34,9 @@ func TestParseTelnetSpot(t *testing.T) {
 	if got, want := spot.Band, "20m"; got != want {
 		t.Fatalf("band = %q, want %q", got, want)
 	}
+	if got, want := spot.FrequencyKHz, 14054.4; got != want {
+		t.Fatalf("frequency_khz = %.1f, want %.1f", got, want)
+	}
 	if got, want := spot.TransmitMode, "CW"; got != want {
 		t.Fatalf("transmit mode = %q, want %q", got, want)
 	}

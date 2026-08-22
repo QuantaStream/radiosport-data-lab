@@ -2,7 +2,6 @@ package rbn
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -58,7 +57,7 @@ func ParseTelnetSpot(line string, now time.Time, lookup CallsignLookup) (Spot, b
 		SpottedAt:    spottedAt,
 		SpotterCall:  spotterCall,
 		DXCall:       dxCall,
-		FrequencyHz:  int64(math.Round(freqKHz * 1000)),
+		FrequencyKHz: freqKHz,
 		Band:         band,
 		Mode:         fields[10],
 		SignalDB:     signalDB,

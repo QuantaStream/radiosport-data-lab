@@ -21,7 +21,7 @@ type Spot struct {
 	DXCall           string
 	DXPrefix         string
 	DXContinent      string
-	FrequencyHz      int64
+	FrequencyKHz     float64
 	Band             string
 	Mode             string
 	SignalDB         int
@@ -65,11 +65,15 @@ func StableSpotID(s Spot) uint64 {
 	writePart(s.SpottedAt.UTC().Format(time.RFC3339Nano))
 	writePart(s.SpotterCall)
 	writePart(s.DXCall)
-	writePart(strconv.FormatInt(s.FrequencyHz, 10))
+	writePart(formatFrequencyKHz(s.FrequencyKHz))
 	writePart(s.Mode)
 	writePart(strconv.Itoa(s.SignalDB))
 	writePart(strconv.Itoa(s.SpeedWPM))
 	writePart(s.TransmitMode)
 	// Keep the synthetic key inside signed-int64 range for SQL driver portability.
 	return h.Sum64() & ((uint64(1) << 63) - 1)
+}
+
+func formatFrequencyKHz(freq float64) string {
+	return strconv.FormatFloat(freq, 'f', 1, 64)
 }

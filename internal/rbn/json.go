@@ -8,21 +8,21 @@ type SpotEvent struct {
 }
 
 type SpotPayload struct {
-	SpotID           uint64 `json:"spot_id"`
-	SpottedAt        string `json:"spotted_at"`
-	SpotterCall      string `json:"spotter_call"`
-	SpotterPrefix    string `json:"spotter_prefix"`
-	SpotterContinent string `json:"spotter_continent"`
-	DXCall           string `json:"dx_call"`
-	DXPrefix         string `json:"dx_prefix"`
-	DXContinent      string `json:"dx_continent"`
-	FrequencyHz      int64  `json:"frequency_hz"`
-	Band             string `json:"band"`
-	Mode             string `json:"mode"`
-	SignalDB         int    `json:"signal_db"`
-	SpeedWPM         int    `json:"speed_wpm"`
-	TransmitMode     string `json:"transmit_mode"`
-	Source           string `json:"source"`
+	SpotID           uint64  `json:"spot_id"`
+	SpottedAt        string  `json:"spotted_at"`
+	SpotterCall      string  `json:"spotter_call"`
+	SpotterPrefix    string  `json:"spotter_prefix"`
+	SpotterContinent string  `json:"spotter_continent"`
+	DXCall           string  `json:"dx_call"`
+	DXPrefix         string  `json:"dx_prefix"`
+	DXContinent      string  `json:"dx_continent"`
+	FrequencyKHz     float64 `json:"frequency_khz"`
+	Band             string  `json:"band"`
+	Mode             string  `json:"mode"`
+	SignalDB         int     `json:"signal_db"`
+	SpeedWPM         int     `json:"speed_wpm"`
+	TransmitMode     string  `json:"transmit_mode"`
+	Source           string  `json:"source"`
 }
 
 func NewSpotEvent(spot Spot) SpotEvent {
@@ -37,7 +37,7 @@ func NewSpotEvent(spot Spot) SpotEvent {
 			DXCall:           spot.DXCall,
 			DXPrefix:         spot.DXPrefix,
 			DXContinent:      spot.DXContinent,
-			FrequencyHz:      spot.FrequencyHz,
+			FrequencyKHz:     spot.FrequencyKHz,
 			Band:             spot.Band,
 			Mode:             spot.Mode,
 			SignalDB:         spot.SignalDB,
