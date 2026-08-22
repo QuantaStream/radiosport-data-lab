@@ -1,6 +1,11 @@
 package qrz
 
-import "time"
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+)
 
 const unknownString = "UNKNOWN"
 
@@ -86,4 +91,35 @@ func formatSQLTime(t time.Time) string {
 		t = time.Now()
 	}
 	return t.UTC().Format("2006-01-02 15:04:05")
+}
+
+type SQLStore struct {
+	DB *sql.DB
+}
+
+func (s SQLStore) HasProfile(ctx context.Context, call string) (bool, error) {
+	if s.DB == nil {
+		return false, fmt.Errorf("nil sql db")
+	}
+	var status string
+	err := s.DB.QueryRowContext(ctx, `select lookup_status from qrz_callsigns where callsign = ? limit 1`, normalizeCallsign(call)).Scan(&status)
+	if err == nil {
+		return true, nil
+	}
+	if errorsIsNoRows(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (s SQLStore) InsertProfile(ctx context.Context, profile Profile) error {
+	if s.DB == nil {
+		return fmt.Errorf("nil sql db")
+	}
+	_, err := s.DB.ExecContext(ctx, ProfileInsertSQL, ProfileSQLArgs(profile)...)
+	return err
+}
+
+func errorsIsNoRows(err error) bool {
+	return err == sql.ErrNoRows
 }

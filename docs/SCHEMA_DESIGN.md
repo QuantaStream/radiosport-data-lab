@@ -8,10 +8,11 @@ The RBN archive for 2026-08-21 is a zipped CSV with this header:
 callsign,de_pfx,de_cont,freq,band,dx,dx_pfx,dx_cont,mode,db,date,speed,tx_mode
 ```
 
-`callsign` is the spotting receiver. `dx` is the station being heard. The archive
-already includes DXCC prefix and continent for both callsigns. The telnet feed is
-lighter: it arrives as a text line and needs the callsign parser to add prefix,
-continent, and band metadata.
+`callsign` is the spotting receiver. `dx` is the station being heard. The current
+archive shape already includes a full timestamp plus DXCC prefix and continent
+for both callsigns. Older/minute-only archive shapes can derive the day from the
+file name. The telnet feed is lighter: it arrives as a text line and needs the
+callsign parser to add prefix, continent, and band metadata.
 
 ## Tables
 
@@ -65,5 +66,28 @@ QRZ access should be optional and configured with environment variables such as
 are normal and should be recorded as `lookup_status='not_found'` instead of
 failing the spot pipeline.
 
+`cmd/rbn-qrz-lookup` performs direct QRZ XML lookups. With `-insert`, it writes
+the mapped row into `qrz_callsigns`; without `-insert`, it prints JSON so the
+shape can be inspected. CTY enrichment can fill DXCC prefix, continent, country,
+CQ zone, and ITU zone when QRZ omits those values.
+
+Live telnet ingestion can enable QRZ cache warming with `-qrz-enrich`. That work
+runs behind a bounded async queue after spot commits, so QRZ latency never slows
+the telnet read/insert path.
+
 Aliases should eventually be normalized into a small `qrz_aliases` table rather
 than stored as one searchable comma-delimited string.
+
+## Enrichment Failure Rule
+
+CTY/DXCC enrichment is local file data. The app looks for `RBN_CTY_DAT` first,
+then `data/cty/cty.dat`. Use `cmd/rbn-update-cty` to refresh the file
+explicitly; normal ingestion does not download country data at startup.
+
+Spot ingestion is lossless-first. If the core spot structure is valid but DXCC or
+QRZ enrichment fails, the spot row is still inserted. Prefix and continent fields
+fall back to `UNKNOWN`, and enrichment failures should be counted/logged for
+parser improvement work.
+
+Hard rejects are limited to malformed spot structure, invalid core callsign
+shape, unparseable frequency, unparseable signal/speed, or unusable timestamp.
