@@ -30,8 +30,8 @@ attributes:
   mappingStrategy: StringEnum
   type: String
   sourceOrdinal: 5
-- fieldName: country_code
-  sourceName: /data/country_code
+- fieldName: qrz_ccode
+  sourceName: /data/qrz_ccode
   mappingStrategy: IntBSI
   type: Integer
   sourceOrdinal: 6
