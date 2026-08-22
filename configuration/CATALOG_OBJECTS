@@ -1,0 +1,11 @@
+objects:
+- schema_name: quanta
+  table_name: qrz_callsigns
+  object_type: TABLE
+  creation_date: 2026-08-22T00:00:00Z
+  modification_date: 2026-08-22T00:00:00Z
+- schema_name: quanta
+  table_name: spots
+  object_type: TABLE
+  creation_date: 2026-08-22T00:00:00Z
+  modification_date: 2026-08-22T00:00:00Z

@@ -1,0 +1,148 @@
+package rbn
+
+import (
+	"encoding/csv"
+	"fmt"
+	"io"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+)
+
+var ArchiveHeader = []string{
+	"callsign",
+	"de_pfx",
+	"de_cont",
+	"freq",
+	"band",
+	"dx",
+	"dx_pfx",
+	"dx_cont",
+	"mode",
+	"db",
+	"date",
+	"speed",
+	"tx_mode",
+}
+
+const archiveTimeLayout = "2006-01-02 15:04:05"
+
+type ArchiveStats struct {
+	Rows          int
+	RejectedRows  int
+	SkippedFooter int
+}
+
+func ReadArchiveCSV(r io.Reader, emit func(Spot) error) (ArchiveStats, error) {
+	reader := csv.NewReader(r)
+	reader.FieldsPerRecord = -1
+
+	header, err := reader.Read()
+	if err != nil {
+		return ArchiveStats{}, fmt.Errorf("read archive header: %w", err)
+	}
+	if !sameHeader(header, ArchiveHeader) {
+		return ArchiveStats{}, fmt.Errorf("unexpected archive header: got %v", header)
+	}
+
+	var stats ArchiveStats
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			return stats, nil
+		}
+		if err != nil {
+			stats.RejectedRows++
+			continue
+		}
+		if isArchiveFooter(record) {
+			stats.SkippedFooter++
+			continue
+		}
+		spot, err := ParseArchiveRecord(record)
+		if err != nil {
+			stats.RejectedRows++
+			continue
+		}
+		if err := emit(spot); err != nil {
+			return stats, err
+		}
+		stats.Rows++
+	}
+}
+
+func ParseArchiveRecord(record []string) (Spot, error) {
+	if len(record) != len(ArchiveHeader) {
+		return Spot{}, fmt.Errorf("archive row has %d fields, want %d", len(record), len(ArchiveHeader))
+	}
+
+	spotterCall, ok := NormalizeCallsign(record[0])
+	if !ok {
+		return Spot{}, fmt.Errorf("invalid spotter callsign %q", record[0])
+	}
+	dxCall, ok := NormalizeCallsign(record[5])
+	if !ok {
+		return Spot{}, fmt.Errorf("invalid dx callsign %q", record[5])
+	}
+
+	freqKHz, err := strconv.ParseFloat(strings.TrimSpace(record[3]), 64)
+	if err != nil {
+		return Spot{}, fmt.Errorf("parse frequency %q: %w", record[3], err)
+	}
+	signalDB, err := strconv.Atoi(strings.TrimSpace(record[9]))
+	if err != nil {
+		return Spot{}, fmt.Errorf("parse db %q: %w", record[9], err)
+	}
+	speedWPM, err := strconv.Atoi(strings.TrimSpace(record[11]))
+	if err != nil {
+		return Spot{}, fmt.Errorf("parse speed %q: %w", record[11], err)
+	}
+	spottedAt, err := time.ParseInLocation(archiveTimeLayout, strings.TrimSpace(record[10]), time.UTC)
+	if err != nil {
+		return Spot{}, fmt.Errorf("parse date %q: %w", record[10], err)
+	}
+
+	spot := Spot{
+		SpottedAt:        spottedAt,
+		SpotterCall:      spotterCall,
+		SpotterPrefix:    normalizeCode(record[1]),
+		SpotterContinent: normalizeCode(record[2]),
+		DXCall:           dxCall,
+		DXPrefix:         normalizeCode(record[6]),
+		DXContinent:      normalizeCode(record[7]),
+		FrequencyHz:      int64(math.Round(freqKHz * 1000)),
+		Band:             strings.TrimSpace(record[4]),
+		Mode:             strings.TrimSpace(record[8]),
+		SignalDB:         signalDB,
+		SpeedWPM:         speedWPM,
+		TransmitMode:     strings.TrimSpace(record[12]),
+		Source:           SourceArchive,
+	}
+	spot.SpotID = StableSpotID(spot)
+	return spot, nil
+}
+
+func sameHeader(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if strings.TrimSpace(got[i]) != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func isArchiveFooter(record []string) bool {
+	if len(record) != 1 {
+		return false
+	}
+	value := strings.TrimSpace(record[0])
+	return strings.HasPrefix(value, "(") && strings.HasSuffix(value, " rows)")
+}
+
+func normalizeCode(input string) string {
+	return strings.ToUpper(strings.TrimSpace(input))
+}
