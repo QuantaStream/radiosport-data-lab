@@ -9,6 +9,8 @@ import (
 
 const SourceArchive = "archive"
 
+const UnknownValue = "UNKNOWN"
+
 // Spot is the normalized event shape used by both archive and telnet ingestion.
 type Spot struct {
 	SpotID           uint64

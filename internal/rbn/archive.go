@@ -35,6 +35,10 @@ type ArchiveStats struct {
 }
 
 func ReadArchiveCSV(r io.Reader, emit func(Spot) error) (ArchiveStats, error) {
+	return ReadArchiveCSVWithDate(r, time.Time{}, emit)
+}
+
+func ReadArchiveCSVWithDate(r io.Reader, archiveDate time.Time, emit func(Spot) error) (ArchiveStats, error) {
 	reader := csv.NewReader(r)
 	reader.FieldsPerRecord = -1
 
@@ -60,7 +64,7 @@ func ReadArchiveCSV(r io.Reader, emit func(Spot) error) (ArchiveStats, error) {
 			stats.SkippedFooter++
 			continue
 		}
-		spot, err := ParseArchiveRecord(record)
+		spot, err := ParseArchiveRecordWithDate(record, archiveDate)
 		if err != nil {
 			stats.RejectedRows++
 			continue
@@ -73,6 +77,10 @@ func ReadArchiveCSV(r io.Reader, emit func(Spot) error) (ArchiveStats, error) {
 }
 
 func ParseArchiveRecord(record []string) (Spot, error) {
+	return ParseArchiveRecordWithDate(record, time.Time{})
+}
+
+func ParseArchiveRecordWithDate(record []string, archiveDate time.Time) (Spot, error) {
 	if len(record) != len(ArchiveHeader) {
 		return Spot{}, fmt.Errorf("archive row has %d fields, want %d", len(record), len(ArchiveHeader))
 	}
@@ -98,7 +106,7 @@ func ParseArchiveRecord(record []string) (Spot, error) {
 	if err != nil {
 		return Spot{}, fmt.Errorf("parse speed %q: %w", record[11], err)
 	}
-	spottedAt, err := time.ParseInLocation(archiveTimeLayout, strings.TrimSpace(record[10]), time.UTC)
+	spottedAt, err := parseArchiveTimestamp(strings.TrimSpace(record[10]), archiveDate)
 	if err != nil {
 		return Spot{}, fmt.Errorf("parse date %q: %w", record[10], err)
 	}
@@ -123,6 +131,43 @@ func ParseArchiveRecord(record []string) (Spot, error) {
 	return spot, nil
 }
 
+func parseArchiveTimestamp(value string, archiveDate time.Time) (time.Time, error) {
+	for _, layout := range []string{
+		archiveTimeLayout,
+		"2006-01-02 15:04",
+		time.RFC3339,
+	} {
+		if ts, err := time.ParseInLocation(layout, value, time.UTC); err == nil {
+			return ts, nil
+		}
+	}
+	if archiveDate.IsZero() {
+		return time.Time{}, fmt.Errorf("full timestamp required when archive date is unknown")
+	}
+
+	archiveDate = archiveDate.UTC()
+	for _, layout := range []string{"15:04:05", "15:04"} {
+		if t, err := time.ParseInLocation(layout, value, time.UTC); err == nil {
+			return time.Date(archiveDate.Year(), archiveDate.Month(), archiveDate.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC), nil
+		}
+	}
+	if len(value) == 5 && strings.HasSuffix(value, "Z") {
+		value = value[:4]
+	}
+	if len(value) == 4 {
+		hour, err := strconv.Atoi(value[:2])
+		if err != nil {
+			return time.Time{}, err
+		}
+		minute, err := strconv.Atoi(value[2:])
+		if err != nil {
+			return time.Time{}, err
+		}
+		return time.Date(archiveDate.Year(), archiveDate.Month(), archiveDate.Day(), hour, minute, 0, 0, time.UTC), nil
+	}
+	return time.Time{}, fmt.Errorf("unsupported archive timestamp")
+}
+
 func sameHeader(got, want []string) bool {
 	if len(got) != len(want) {
 		return false
@@ -144,5 +189,9 @@ func isArchiveFooter(record []string) bool {
 }
 
 func normalizeCode(input string) string {
-	return strings.ToUpper(strings.TrimSpace(input))
+	value := strings.ToUpper(strings.TrimSpace(input))
+	if value == "" {
+		return UnknownValue
+	}
+	return value
 }

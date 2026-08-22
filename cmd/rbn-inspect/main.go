@@ -1,13 +1,10 @@
 package main
 
 import (
-	"archive/zip"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
 )
@@ -18,14 +15,14 @@ func main() {
 		log.Fatalf("usage: rbn-inspect <RBN daily .zip or .csv>")
 	}
 
-	reader, closeFn, err := openArchive(os.Args[1])
+	reader, archiveDate, err := rbn.OpenArchiveFile(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer closeFn()
+	defer reader.Close()
 
 	profile := newProfile()
-	stats, err := rbn.ReadArchiveCSV(reader, func(spot rbn.Spot) error {
+	stats, err := rbn.ReadArchiveCSVWithDate(reader, archiveDate, func(spot rbn.Spot) error {
 		profile.observe(spot)
 		return nil
 	})
@@ -42,32 +39,6 @@ func main() {
 	printTop("tx_modes", profile.txModes, 12)
 	printTop("spotter_continents", profile.spotterContinents, 12)
 	printTop("dx_continents", profile.dxContinents, 12)
-}
-
-func openArchive(path string) (io.Reader, func(), error) {
-	if strings.HasSuffix(strings.ToLower(path), ".zip") {
-		zr, err := zip.OpenReader(path)
-		if err != nil {
-			return nil, func() {}, err
-		}
-		for _, file := range zr.File {
-			if strings.HasSuffix(strings.ToLower(file.Name), ".csv") {
-				rc, err := file.Open()
-				if err != nil {
-					_ = zr.Close()
-					return nil, func() {}, err
-				}
-				return rc, func() { _ = rc.Close(); _ = zr.Close() }, nil
-			}
-		}
-		_ = zr.Close()
-		return nil, func() {}, fmt.Errorf("zip archive contains no csv file")
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, func() {}, err
-	}
-	return f, func() { _ = f.Close() }, nil
 }
 
 type profile struct {

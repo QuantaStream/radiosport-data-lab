@@ -76,6 +76,18 @@ func ParseTelnetSpot(line string, now time.Time, lookup CallsignLookup) (Spot, b
 			spot.DXContinent = info.Continent
 		}
 	}
+	if spot.SpotterPrefix == "" {
+		spot.SpotterPrefix = UnknownValue
+	}
+	if spot.SpotterContinent == "" {
+		spot.SpotterContinent = UnknownValue
+	}
+	if spot.DXPrefix == "" {
+		spot.DXPrefix = UnknownValue
+	}
+	if spot.DXContinent == "" {
+		spot.DXContinent = UnknownValue
+	}
 	spot.SpotID = StableSpotID(spot)
 	return spot, true, nil
 }

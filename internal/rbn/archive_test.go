@@ -41,3 +41,27 @@ func TestReadArchiveCSVSkipsFooter(t *testing.T) {
 		t.Fatalf("spotted_at = %s, want %s", got, want)
 	}
 }
+
+func TestReadArchiveCSVUsesFilenameDateFallbackShape(t *testing.T) {
+	input := strings.Join([]string{
+		"callsign,de_pfx,de_cont,freq,band,dx,dx_pfx,dx_cont,mode,db,date,speed,tx_mode",
+		"G4IRN,G,EU,14054.4,20m,KC2SIZ,K,NA,CQ,25,0000Z,13,CW",
+	}, "\n")
+	archiveDate := time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)
+
+	var spots []Spot
+	stats, err := ReadArchiveCSVWithDate(strings.NewReader(input), archiveDate, func(spot Spot) error {
+		spots = append(spots, spot)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Rows != 1 || stats.RejectedRows != 0 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	want := time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)
+	if got := spots[0].SpottedAt; !got.Equal(want) {
+		t.Fatalf("spotted_at = %s, want %s", got, want)
+	}
+}

@@ -1,0 +1,24 @@
+England:                  14:  27:  EU:   52.77:     1.47:     0.0:  G:
+    G,GB,GW;
+Scotland:                 14:  27:  EU:   56.82:     4.18:     0.0:  GM:
+    GM,GS,MM;
+Federal Republic of Germany: 14: 28: EU:   51.00:   -10.00:    -1.0:  DL:
+    DA,DB,DC,DD,DE,DF,DG,DH,DI,DJ,DK,DL,DM,DN,DO,DP,DQ,DR;
+Spain:                    14:  37:  EU:   40.37:     3.72:    -1.0:  EA:
+    AM,AN,AO,EA,EB,EC,ED,EE,EF,EG,EH;
+Ecuador:                  10:  12:  SA:   -1.40:    78.40:     5.0:  HC:
+    HC,HD;
+United States:            05:  08:  NA:   37.53:    91.67:     5.0:  K:
+    AA,AB,AC,AD,AE,AF,AG,AI,AJ,AK,K,N,W;
+Turks & Caicos Islands:   08:  11:  NA:   21.77:    71.75:     5.0:  VP5:
+    VP5;
+Montserrat:               08:  11:  NA:   16.75:    62.20:     4.0:  VP2M:
+    VP2M,VP2E;
+Asiatic Russia:           17:  20:  AS:   55.88:   -84.08:    -7.0:  UA9:
+    R8,R9,RA8,RA9,RK8,RK9,RU8,RU9,RV8,RV9,RW8,RW9,UA9,UG4I(16)[29];
+Ukraine:                  16:  29:  EU:   49.00:   -32.00:    -2.0:  UR:
+    EM,EN,EO,U5,UR,US,UT,UU,UV,UW,UX,UY,UZ;
+Japan:                    25:  45:  AS:   36.40:  -138.38:    -9.0:  JA:
+    7J,7K,7L,7M,7N,8J,8N,JA,JE,JF,JG,JH,JI,JJ,JK,JL,JM,JN,JO,JP,JQ,JR,JS;
+United Nations HQ:        05:  08:  NA:   40.75:    73.97:     5.0:  4U1U:
+    =4U1UN;
