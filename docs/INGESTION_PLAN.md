@@ -196,7 +196,10 @@ For backfills, prefer parallelism across archive files with `-day-workers`
 rather than increasing `-workers` inside one file. A single daily archive routes
 to one physical day shard, so extra POST workers mostly add client-side pressure.
 Multiple daily files give the loader independent physical build shards to drain.
-The `-limit` flag applies per archive file.
+The `-limit` flag applies per archive file. For throughput tests, choose daily
+files with roughly similar row counts. One unusually large day will dominate the
+wall-clock time even when smaller days finish quickly. For stress and sustained
+load testing, include the large days deliberately and report the skew.
 
 Local flat-loader matrix:
 
