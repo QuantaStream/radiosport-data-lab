@@ -115,9 +115,9 @@ paths to test a different file set.
 
 Results:
 
-| Run | Days | Rows | Accepted | Failed | Elapsed | Rows/Sec |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Balanced day set | 12 | 3,702,151 | 3,702,151 | 0 | 12.425s | 297,960 |
+| Run | Days | Rows | Accepted | Failed | Client Elapsed | Client Rows/Sec | Visible Elapsed | Visible Rows/Sec |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced day set | 12 | 3,702,151 | 3,702,151 | 0 | 12.463s | 297,051 | 42.000s | 88,146 |
 
 The database count matched exactly:
 
@@ -126,8 +126,10 @@ select count(*) as spots_flat_count from spots_flat;
 -- 3702151
 ```
 
-Loader stats after the balanced run showed no queue backlog, no open sessions,
-and zero flush errors.
+The client accepted all rows in 12.463s. The benchmark harness then waited for
+loader drain and visible row-count parity before running query timings; the
+fully visible point arrived at 42.000s. Loader stats after drain showed no queue
+backlog, no open sessions, and zero flush errors.
 
 An intentionally larger sixteen-day run loaded 8,224,848 rows in 70.666s
 (~116,390 rows/sec). That run mixed several much larger weekend files with
@@ -142,13 +144,14 @@ Representative query timings on the balanced 3.7M-row `spots_flat` dataset:
 
 | Query Shape | Result | Time |
 | --- | ---: | ---: |
-| `dx_call LIKE 'N7%'` count | 19,047 | 0.155s |
-| `dx_call LIKE 'OE/DL7UZO%'` count | 350 | 0.137s |
+| `count(*)` | 3,702,151 | 0.007s |
+| `dx_call LIKE 'N7%'` count | 19,047 | 0.162s |
+| `dx_call LIKE 'OE/DL7UZO%'` count | 350 | 0.030s |
 | `dx_call LIKE 'OE/DL7UZO%'` detail/order/limit | 20 rows | 0.04s |
-| `group by band, mode` | 20 rows | 0.39s |
-| `group by dx_prefix` Top 25 | 25 rows | 0.81s |
+| `group by band, mode` | 20 rows | 0.354s |
+| `group by dx_prefix` Top 25 | 25 rows | 0.805s |
 | `group by spotter_continent, dx_continent` | 36 rows | 0.25s |
-| `band = '20m'`, group by prefix, average signal | 20 rows | 0.07s |
+| `band = '20m'`, group by prefix, average signal | 20 rows | 0.073s |
 | `spotted_at >= todate('2026-08-20')`, group by prefix/band | 30 rows | 0.04s |
 
 These are the strongest workload signals from the test:
