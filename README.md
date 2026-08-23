@@ -20,6 +20,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
 - `docs/LOADER_BENCHMARK_20260823.md` records the local flat-loader baseline.
+- `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
+  distributed flat-loader benchmark and captures a tarball of evidence.
 
 ## Data Sources
 

@@ -103,27 +103,14 @@ go run ./cmd/quantastream-loader \
 Balanced twelve-day archive load:
 
 ```bash
-go run ./cmd/rbn-archive-load \
-  -target http://127.0.0.1:8088/ingest/json \
-  -batch-size 2000 \
-  -workers 1 \
-  -day-workers 12 \
-  -spot-type rbn_spot_flat \
-  -qrz-parents=false \
-  -dense-spot-ids \
-  /tmp/rbn-data/20260806.zip \
-  /tmp/rbn-data/20260807.zip \
-  /tmp/rbn-data/20260810.zip \
-  /tmp/rbn-data/20260811.zip \
-  /tmp/rbn-data/20260812.zip \
-  /tmp/rbn-data/20260813.zip \
-  /tmp/rbn-data/20260814.zip \
-  /tmp/rbn-data/20260817.zip \
-  /tmp/rbn-data/20260818.zip \
-  /tmp/rbn-data/20260819.zip \
-  /tmp/rbn-data/20260820.zip \
-  /tmp/rbn-data/20260821.zip
+./scripts/run-aws-distributed-flat-loader-benchmark.sh
 ```
+
+The script defaults to the same twelve balanced archive files used for this
+benchmark, truncates `spots_flat`, runs the archive loader, validates the
+visible row count, captures loader stats and representative query timings, and
+writes a timestamped tarball under `/tmp`. Pass explicit archive paths to test a
+different file set.
 
 Results:
 
