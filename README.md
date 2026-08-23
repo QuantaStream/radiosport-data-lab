@@ -68,7 +68,8 @@ enrichment updates those rows later.
 For loader pipeline tests, `spots_flat` provides the same spot fact shape without
 the QRZ relationship vector. Use `rbn-archive-load -spot-type rbn_spot_flat
 -qrz-parents=false -dense-spot-ids` to isolate raw archive ingestion throughput
-with storage-friendly day-local column IDs.
+with storage-friendly day-local column IDs. Pass multiple daily archive files
+and `-day-workers N` to parallelize a historical backfill across days.
 
 ## Near-Term Build Plan
 

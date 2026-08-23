@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -19,17 +20,19 @@ func main() {
 	target := flag.String("target", "http://127.0.0.1:8088/ingest/json", "qstream-loader JSON ingest endpoint")
 	batchSize := flag.Int("batch-size", 1000, "events per loader POST")
 	workers := flag.Int("workers", 1, "concurrent loader POST workers; use with -qrz-parents=false for flat loads")
-	limit := flag.Int("limit", 0, "maximum records to load; 0 means no limit")
+	dayWorkers := flag.Int("day-workers", 1, "concurrent archive day files to load")
+	limit := flag.Int("limit", 0, "maximum records to load per archive file; 0 means no limit")
 	spotType := flag.String("spot-type", rbn.DefaultSpotEventType, "event type used for spot records")
 	qrzParents := flag.Bool("qrz-parents", true, "emit pending qrz_callsign parent events before spots")
 	denseSpotIDs := flag.Bool("dense-spot-ids", false, "assign day-local dense spot ids for storage-friendly archive backfills")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-request timeout")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: rbn-archive-load [flags] <RBN daily .zip or .csv>\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: rbn-archive-load [flags] <RBN daily .zip or .csv> [...]\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	if flag.NArg() != 1 {
+	paths := flag.Args()
+	if len(paths) == 0 {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -39,23 +42,127 @@ func main() {
 	if *workers <= 0 {
 		log.Fatal("-workers must be greater than zero")
 	}
-	if *workers > 1 && *qrzParents {
-		log.Fatal("-workers greater than 1 requires -qrz-parents=false; relationship loads must preserve parent-before-spot order")
+	if *dayWorkers <= 0 {
+		log.Fatal("-day-workers must be greater than zero")
+	}
+	if (*workers > 1 || *dayWorkers > 1) && *qrzParents {
+		log.Fatal("-workers or -day-workers greater than 1 requires -qrz-parents=false; relationship loads must preserve parent-before-spot order")
 	}
 
-	reader, archiveDate, err := rbn.OpenArchiveFile(flag.Arg(0))
+	sort.Strings(paths)
+	config := loadConfig{
+		target:       *target,
+		batchSize:    *batchSize,
+		postWorkers:  *workers,
+		limit:        *limit,
+		spotType:     *spotType,
+		qrzParents:   *qrzParents,
+		denseSpotIDs: *denseSpotIDs,
+		timeout:      *timeout,
+	}
+
+	startedAt := time.Now()
+	results := loadArchives(context.Background(), config, paths, *dayWorkers)
+	var rows, emitted, accepted, failed, rejectedRows, skippedFooter int
+	var firstErr error
+	for _, result := range results {
+		rows += result.rows
+		emitted += result.emitted
+		accepted += result.accepted
+		failed += result.failed
+		rejectedRows += result.rejectedRows
+		skippedFooter += result.skippedFooter
+		if len(paths) > 1 {
+			fmt.Fprintf(os.Stderr, "file=%s rows=%d emitted=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
+				result.path, result.rows, result.emitted, result.accepted, result.failed, result.rejectedRows,
+				result.skippedFooter, result.elapsed.Round(time.Millisecond))
+		}
+		if result.err != nil && firstErr == nil {
+			firstErr = result.err
+		}
+	}
+	fmt.Fprintf(os.Stderr, "files=%d rows=%d emitted=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
+		len(paths), rows, emitted, accepted, failed, rejectedRows, skippedFooter, time.Since(startedAt).Round(time.Millisecond))
+	if firstErr != nil {
+		log.Fatal(firstErr)
+	}
+	if failed > 0 {
+		os.Exit(1)
+	}
+}
+
+var errLimitReached = fmt.Errorf("limit reached")
+
+func loadArchives(ctx context.Context, config loadConfig, paths []string, dayWorkers int) []archiveLoadResult {
+	if dayWorkers > len(paths) {
+		dayWorkers = len(paths)
+	}
+	if dayWorkers <= 1 {
+		results := make([]archiveLoadResult, 0, len(paths))
+		for _, path := range paths {
+			results = append(results, loadArchive(ctx, config, path))
+		}
+		return results
+	}
+
+	loadCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	jobs := make(chan string)
+	results := make(chan archiveLoadResult, len(paths))
+	var wg sync.WaitGroup
+	for i := 0; i < dayWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for path := range jobs {
+				result := loadArchive(loadCtx, config, path)
+				if result.err != nil {
+					cancel()
+				}
+				results <- result
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, path := range paths {
+			select {
+			case <-loadCtx.Done():
+				return
+			case jobs <- path:
+			}
+		}
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	collected := make([]archiveLoadResult, 0, len(paths))
+	for result := range results {
+		collected = append(collected, result)
+	}
+	sort.Slice(collected, func(i, j int) bool {
+		return collected[i].path < collected[j].path
+	})
+	return collected
+}
+
+func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoadResult {
+	startedAt := time.Now()
+	result := archiveLoadResult{path: path}
+	reader, archiveDate, err := rbn.OpenArchiveFile(path)
 	if err != nil {
-		log.Fatal(err)
+		result.err = err
+		return result
 	}
 	defer reader.Close()
 
-	client := rbn.LoaderClient{Target: *target}
-	ctx := context.Background()
-	poster := newBatchPoster(ctx, client, *timeout, *workers)
+	client := rbn.LoaderClient{Target: config.target}
+	poster := newBatchPoster(ctx, client, config.timeout, config.postWorkers)
 	defer poster.Close()
-	batch := make([]interface{}, 0, *batchSize)
+	batch := make([]interface{}, 0, config.batchSize)
 	seenQRZ := map[string]struct{}{}
-	var emitted int
 	flush := func() error {
 		if len(batch) == 0 {
 			return nil
@@ -67,49 +174,60 @@ func main() {
 	}
 
 	stats, err := rbn.ReadArchiveCSVWithDate(reader, archiveDate, func(spot rbn.Spot) error {
-		if *limit > 0 && emitted >= *limit {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if config.limit > 0 && result.emitted >= config.limit {
 			return errLimitReached
 		}
-		if *qrzParents {
+		if config.qrzParents {
 			if _, ok := seenQRZ[spot.DXCall]; !ok {
 				seenQRZ[spot.DXCall] = struct{}{}
 				batch = append(batch, qrz.NewPendingProfileEvent(spot.DXCall))
-				if len(batch) >= *batchSize {
+				if len(batch) >= config.batchSize {
 					if err := flush(); err != nil {
 						return err
 					}
 				}
 			}
 		}
-		if *denseSpotIDs {
-			spot.SpotID = rbn.DenseArchiveSpotID(spot.SpottedAt, emitted)
+		if config.denseSpotIDs {
+			spot.SpotID = rbn.DenseArchiveSpotID(spot.SpottedAt, result.emitted)
 		}
-		batch = append(batch, rbn.NewSpotEventWithType(spot, *spotType))
-		emitted++
-		if len(batch) >= *batchSize {
+		batch = append(batch, rbn.NewSpotEventWithType(spot, config.spotType))
+		result.emitted++
+		if len(batch) >= config.batchSize {
 			return flush()
 		}
 		return nil
 	})
 	if err != nil && err != errLimitReached {
-		log.Fatal(err)
+		result.err = err
+		result.elapsed = time.Since(startedAt)
+		return result
 	}
 	if err := flush(); err != nil {
-		log.Fatal(err)
+		result.err = err
+		result.elapsed = time.Since(startedAt)
+		return result
 	}
 	accepted, failed, err := poster.Close()
 	if err != nil {
-		log.Fatal(err)
+		result.err = err
 	}
-
-	fmt.Fprintf(os.Stderr, "rows=%d emitted=%d accepted=%d failed=%d rejected=%d skipped_footer=%d\n",
-		stats.Rows, emitted, accepted, failed, stats.RejectedRows, stats.SkippedFooter)
+	result.rows = stats.Rows
+	result.accepted = accepted
+	result.failed = failed
+	result.rejectedRows = stats.RejectedRows
+	result.skippedFooter = stats.SkippedFooter
+	result.elapsed = time.Since(startedAt)
 	if failed > 0 {
-		os.Exit(1)
+		result.err = fmt.Errorf("%s had %d loader failures", path, failed)
 	}
+	return result
 }
-
-var errLimitReached = fmt.Errorf("limit reached")
 
 type batchPoster struct {
 	ctx       context.Context
@@ -131,6 +249,29 @@ type postResult struct {
 	accepted int
 	failed   int
 	err      error
+}
+
+type loadConfig struct {
+	target       string
+	batchSize    int
+	postWorkers  int
+	limit        int
+	spotType     string
+	qrzParents   bool
+	denseSpotIDs bool
+	timeout      time.Duration
+}
+
+type archiveLoadResult struct {
+	path          string
+	rows          int
+	emitted       int
+	accepted      int
+	failed        int
+	rejectedRows  int
+	skippedFooter int
+	elapsed       time.Duration
+	err           error
 }
 
 func newBatchPoster(ctx context.Context, client rbn.LoaderClient, timeout time.Duration, workers int) *batchPoster {

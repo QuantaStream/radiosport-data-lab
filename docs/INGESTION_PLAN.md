@@ -164,6 +164,23 @@ go run ./cmd/rbn-archive-load \
   /tmp/rbn-data/20260821.zip
 ```
 
+Parallel flat backfill across multiple daily archive files:
+
+```bash
+go run ./cmd/rbn-archive-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 2000 \
+  -workers 1 \
+  -day-workers 4 \
+  -spot-type rbn_spot_flat \
+  -qrz-parents=false \
+  -dense-spot-ids \
+  /tmp/rbn-data/20260818.zip \
+  /tmp/rbn-data/20260819.zip \
+  /tmp/rbn-data/20260820.zip \
+  /tmp/rbn-data/20260821.zip
+```
+
 Use the flat path when the goal is measuring archive loader throughput without
 relationship-vector or QRZ-cache work. Use the normal `rbn_spot` path when the
 goal is exercising the full relationship-aware application model.
@@ -174,6 +191,12 @@ event identity, but sparse hash values are a poor physical column-id shape for
 bitmap storage. Dense archive IDs are allocated in day-local contiguous ranges
 so one daily file builds compact storage artifacts and multiple days do not
 collide.
+
+For backfills, prefer parallelism across archive files with `-day-workers`
+rather than increasing `-workers` inside one file. A single daily archive routes
+to one physical day shard, so extra POST workers mostly add client-side pressure.
+Multiple daily files give the loader independent physical build shards to drain.
+The `-limit` flag applies per archive file.
 
 Local flat-loader matrix:
 
