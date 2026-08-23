@@ -107,10 +107,11 @@ Balanced twelve-day archive load:
 ```
 
 The script defaults to the same twelve balanced archive files used for this
-benchmark, truncates `spots_flat`, runs the archive loader, validates the
-visible row count, captures loader stats and representative query timings, and
-writes a timestamped tarball under `/tmp`. Pass explicit archive paths to test a
-different file set.
+benchmark, truncates `spots_flat`, runs the archive loader, waits for loader
+drain and visible row count parity, captures loader stats and representative
+query timings, and writes a timestamped tarball under `/tmp`. It records both
+client accepted rows/sec and visible rows/sec after drain. Pass explicit archive
+paths to test a different file set.
 
 Results:
 
