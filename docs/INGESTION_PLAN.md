@@ -33,6 +33,10 @@ The SQL ingester can insert the inner `data` fields directly. The streaming
 loader should emit the full object so `selector: type="rbn_spot"` can route the
 event to the `spots` table.
 
+`spots.dx_call_ref` is a relationship-vector field that reuses `/data/dx_call`
+and points at `qrz_callsigns.callsign`. Ingesters must create a pending QRZ
+parent row before inserting the first spot for a DX callsign.
+
 Current archive files include a full timestamp column. The parser also supports
 older/minute-only shapes by deriving the date from `YYYYMMDD.csv` or
 `YYYYMMDD.zip` file names.
@@ -90,6 +94,11 @@ If `data/cty/cty.dat` exists, telnet ingestion enriches spotter and DX calls
 with DXCC prefix and continent. Missing or unparseable callsigns fall back to
 `UNKNOWN` prefix/continent and the spot is still ingested.
 
+Before each SQL spot batch is committed, the ingester ensures a
+`qrz_callsigns` row exists for every unique DX callsign in the batch. New rows
+start with `lookup_status='pending'`. That keeps `spots.dx_call_ref` valid
+without waiting on QRZ.
+
 Refresh CTY data explicitly:
 
 ```bash
@@ -109,10 +118,12 @@ go run ./cmd/rbn-telnet-sql-ingest \
   -qrz-workers 1
 ```
 
-QRZ enrichment is deliberately async and lossy. `spots` are committed first, and
-then callsigns are offered to a bounded queue with a non-blocking send. If QRZ or
-the cache table falls behind, enrichment work is dropped and counted instead of
-applying backpressure to the telnet stream.
+QRZ network enrichment is deliberately async and lossy. `spots` are committed
+first, and then callsigns are offered to a bounded queue with a non-blocking
+send. If QRZ or the cache table falls behind, enrichment work is dropped and
+counted instead of applying backpressure to the telnet stream. Successful QRZ
+lookups update pending rows to `lookup_status='found'`; not-found lookups update
+them to `lookup_status='not_found'`.
 
 ## Streaming Loader Ingester
 
@@ -122,9 +133,10 @@ path for multi-year data.
 
 Initial target:
 
-1. Parse archive or telnet records into the normalized payload.
-2. Write newline-delimited JSON records with `cmd/rbn-archive-to-jsonl`.
-3. Or POST batches directly to the QuantaStream streaming loader with
+1. Parse archive records into the normalized payload.
+2. Emit one pending `qrz_callsign` event before the first spot for each DX call.
+3. Write newline-delimited JSON records with `cmd/rbn-archive-to-jsonl`.
+4. Or POST batches directly to the QuantaStream streaming loader with
    `cmd/rbn-archive-load`.
 
 This path should be the sustained-throughput baseline.
@@ -145,8 +157,9 @@ QRZ lookups should be asynchronous relative to spot ingestion:
 1. Extract unique callsigns from `spotter_call` and `dx_call`.
 2. Check the local `qrz_callsigns` cache.
 3. Fetch missing profiles from QRZ when credentials are configured.
-4. Insert successful profiles with `lookup_status='found'`.
-5. Insert not-found/cache-negative records with `lookup_status='not_found'`.
+4. Ensure a pending profile row exists when the callsign is first referenced.
+5. Update successful profiles with `lookup_status='found'`.
+6. Update not-found/cache-negative records with `lookup_status='not_found'`.
 
 Environment variables:
 

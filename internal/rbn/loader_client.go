@@ -20,7 +20,7 @@ type LoaderResponse struct {
 	Failed   int `json:"failed"`
 }
 
-func (c LoaderClient) PostEvents(ctx context.Context, events []SpotEvent) (LoaderResponse, error) {
+func (c LoaderClient) PostEvents(ctx context.Context, events []interface{}) (LoaderResponse, error) {
 	if len(events) == 0 {
 		return LoaderResponse{}, nil
 	}

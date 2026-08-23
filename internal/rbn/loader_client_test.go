@@ -19,7 +19,7 @@ func TestLoaderClientPostsEventsBatch(t *testing.T) {
 			t.Fatalf("path = %s, want %s", got, want)
 		}
 		var payload struct {
-			Events []SpotEvent `json:"events"`
+			Events []map[string]interface{} `json:"events"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatal(err)
@@ -30,7 +30,7 @@ func TestLoaderClientPostsEventsBatch(t *testing.T) {
 	defer server.Close()
 
 	client := LoaderClient{Target: server.URL + "/ingest/json", Client: server.Client()}
-	resp, err := client.PostEvents(context.Background(), []SpotEvent{
+	resp, err := client.PostEvents(context.Background(), []interface{}{
 		NewSpotEvent(Spot{
 			SpotID:           1,
 			SpottedAt:        time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC),

@@ -41,16 +41,34 @@ QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-telnet-sql-ingest -qrz-enrich
 ```
 
-The archive parser skips the RBN footer line, validates callsign length, converts
-frequency from kHz to integer Hz, and computes a stable synthetic `spot_id`.
+Relationship join smoke:
+
+```sql
+select
+  s.spotted_at,
+  s.dx_call,
+  s.frequency_khz,
+  q.country_name,
+  q.grid,
+  q.lookup_status
+from spots s
+inner join qrz_callsigns q
+  on s.dx_call_ref = q.callsign
+order by s.spotted_at desc
+limit 50;
+```
+
+The archive parser skips the RBN footer line, validates callsign length, keeps
+frequency in display-friendly kHz, and computes a stable synthetic `spot_id`.
+Archive and live ingesters create pending QRZ parent rows before spots so
+`spots.dx_call_ref` can exercise QS-native relationship joins; async QRZ
+enrichment updates those rows later.
 
 ## Near-Term Build Plan
 
-1. SQL ingester: prepared/batched inserts into the `spots` and `qrz_callsigns`
-   tables.
-2. Streaming loader ingester: emit the same normalized JSON event shape through
-   QuantaStream's streaming loader.
-3. QRZ enrichment: optional callsign profile cache that never backpressures spot
-   ingest.
-4. Benchmarks: compare SQL inserts and streaming loader throughput on the same
+1. Benchmarks: compare SQL inserts and streaming loader throughput on the same
    daily archive.
+2. Query examples: keep Workbench-friendly examples for live spots, QRZ
+   enrichment, and relationship joins.
+3. Additional feeds: add more radiosport data sources against the same schema
+   style.

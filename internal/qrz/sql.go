@@ -8,6 +8,7 @@ import (
 )
 
 const unknownString = "UNKNOWN"
+const PendingLookupStatus = "pending"
 
 const ProfileInsertSQL = `insert into qrz_callsigns (
   callsign,
@@ -31,6 +32,38 @@ const ProfileInsertSQL = `insert into qrz_callsigns (
   lookup_time
 ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
+const ProfileUpdateSQL = `update qrz_callsigns set
+  dxcc_id = ?,
+  dxcc_prefix = ?,
+  continent = ?,
+  country_name = ?,
+  qrz_ccode = ?,
+  first_name = ?,
+  last_name = ?,
+  state = ?,
+  county = ?,
+  grid = ?,
+  latitude = ?,
+  longitude = ?,
+  cq_zone = ?,
+  itu_zone = ?,
+  license_issue_date = ?,
+  license_exp_date = ?,
+  lookup_status = ?,
+  lookup_time = ?
+where callsign = ?`
+
+func PendingProfile(call string, lookupTime time.Time) Profile {
+	return Profile{
+		Callsign:     normalizeCallsign(call),
+		DXCCPrefix:   unknownString,
+		Continent:    unknownString,
+		CountryName:  unknownString,
+		LookupStatus: PendingLookupStatus,
+		LookupTime:   lookupTime.UTC(),
+	}
+}
+
 func ProfileSQLArgs(profile Profile) []interface{} {
 	return []interface{}{
 		profile.Callsign,
@@ -53,6 +86,14 @@ func ProfileSQLArgs(profile Profile) []interface{} {
 		defaultLookupStatus(profile.LookupStatus),
 		formatSQLTime(profile.LookupTime),
 	}
+}
+
+func ProfileUpdateSQLArgs(profile Profile) []interface{} {
+	args := ProfileSQLArgs(profile)
+	if len(args) == 0 {
+		return args
+	}
+	return append(args[1:], profile.Callsign)
 }
 
 func defaultString(value string) string {
@@ -97,19 +138,41 @@ type SQLStore struct {
 	DB *sql.DB
 }
 
-func (s SQLStore) HasProfile(ctx context.Context, call string) (bool, error) {
+func (s SQLStore) LookupStatus(ctx context.Context, call string) (string, bool, error) {
 	if s.DB == nil {
-		return false, fmt.Errorf("nil sql db")
+		return "", false, fmt.Errorf("nil sql db")
 	}
 	var status string
 	err := s.DB.QueryRowContext(ctx, `select lookup_status from qrz_callsigns where callsign = ? limit 1`, normalizeCallsign(call)).Scan(&status)
 	if err == nil {
-		return true, nil
+		return status, true, nil
 	}
 	if errorsIsNoRows(err) {
+		return "", false, nil
+	}
+	return "", false, err
+}
+
+func (s SQLStore) HasProfile(ctx context.Context, call string) (bool, error) {
+	_, ok, err := s.LookupStatus(ctx, call)
+	return ok, err
+}
+
+func (s SQLStore) EnsurePendingProfile(ctx context.Context, call string) (bool, error) {
+	if s.DB == nil {
+		return false, fmt.Errorf("nil sql db")
+	}
+	call = normalizeCallsign(call)
+	if call == "" {
 		return false, nil
 	}
-	return false, err
+	if _, ok, err := s.LookupStatus(ctx, call); err != nil || ok {
+		return false, err
+	}
+	if err := s.InsertProfile(ctx, PendingProfile(call, time.Now())); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (s SQLStore) InsertProfile(ctx context.Context, profile Profile) error {
@@ -118,6 +181,21 @@ func (s SQLStore) InsertProfile(ctx context.Context, profile Profile) error {
 	}
 	_, err := s.DB.ExecContext(ctx, ProfileInsertSQL, ProfileSQLArgs(profile)...)
 	return err
+}
+
+func (s SQLStore) UpdateProfile(ctx context.Context, profile Profile) error {
+	if s.DB == nil {
+		return fmt.Errorf("nil sql db")
+	}
+	_, err := s.DB.ExecContext(ctx, ProfileUpdateSQL, ProfileUpdateSQLArgs(profile)...)
+	return err
+}
+
+func (s SQLStore) StoreProfile(ctx context.Context, profile Profile) error {
+	if _, err := s.EnsurePendingProfile(ctx, profile.Callsign); err != nil {
+		return err
+	}
+	return s.UpdateProfile(ctx, profile)
 }
 
 func errorsIsNoRows(err error) bool {

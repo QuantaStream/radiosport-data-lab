@@ -43,49 +43,57 @@ attributes:
   type: String
   maxLen: 16
   sourceOrdinal: 6
+- fieldName: dx_call_ref
+  sourceName: /data/dx_call
+  mappingStrategy: ParentRelation
+  foreignKey: qrz_callsigns
+  relationshipArtifacts:
+    parentToChild: true
+  type: String
+  sourceOrdinal: 7
 - fieldName: dx_prefix
   sourceName: /data/dx_prefix
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 7
+  sourceOrdinal: 8
 - fieldName: dx_continent
   sourceName: /data/dx_continent
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 8
+  sourceOrdinal: 9
 - fieldName: frequency_khz
   sourceName: /data/frequency_khz
   mappingStrategy: FloatScaleBSI
   type: Float
   scale: 1
-  sourceOrdinal: 9
+  sourceOrdinal: 10
 - fieldName: band
   sourceName: /data/band
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 10
+  sourceOrdinal: 11
 - fieldName: mode
   sourceName: /data/mode
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 11
+  sourceOrdinal: 12
 - fieldName: signal_db
   sourceName: /data/signal_db
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 12
+  sourceOrdinal: 13
 - fieldName: speed_wpm
   sourceName: /data/speed_wpm
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 13
+  sourceOrdinal: 14
 - fieldName: transmit_mode
   sourceName: /data/transmit_mode
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 14
+  sourceOrdinal: 15
 - fieldName: source
   sourceName: /data/source
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 15
+  sourceOrdinal: 16

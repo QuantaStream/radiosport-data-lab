@@ -70,6 +70,7 @@ func main() {
 
 	var stmt *sql.Stmt
 	var db *sql.DB
+	var qrzStore qrz.SQLStore
 	var qrzEnricher *qrz.AsyncEnricher
 	if !*dryRun {
 		db, err = sql.Open("mysql", *dsn)
@@ -85,6 +86,7 @@ func main() {
 			log.Fatal(err)
 		}
 		defer stmt.Close()
+		qrzStore = qrz.SQLStore{DB: db}
 		if *qrzEnrich {
 			client, err := qrz.NewClientFromEnv()
 			if err != nil {
@@ -93,7 +95,7 @@ func main() {
 			qrzEnricher, err = qrz.NewAsyncEnricher(
 				ctx,
 				client,
-				qrz.SQLStore{DB: db},
+				qrzStore,
 				qrz.WithQueueSize(*qrzQueueSize),
 				qrz.WithWorkers(*qrzWorkers),
 				qrz.WithLookupTimeout(*qrzTimeout),
@@ -136,6 +138,9 @@ func main() {
 			batch = batch[:0]
 			firstBufferedAt = time.Time{}
 			return nil
+		}
+		if err := ensureQRZParents(ctx, qrzStore, batch); err != nil {
+			return err
 		}
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
@@ -253,6 +258,24 @@ func readLines(reader *bufio.Reader, lines chan<- string, errs chan<- error) {
 		lines <- scanner.Text()
 	}
 	errs <- scanner.Err()
+}
+
+func ensureQRZParents(ctx context.Context, store qrz.SQLStore, batch []rbn.Spot) error {
+	seen := map[string]struct{}{}
+	for _, spot := range batch {
+		call := strings.ToUpper(strings.TrimSpace(spot.DXCall))
+		if call == "" {
+			continue
+		}
+		if _, ok := seen[call]; ok {
+			continue
+		}
+		seen[call] = struct{}{}
+		if _, err := store.EnsurePendingProfile(ctx, call); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func enqueueQRZProfiles(enricher *qrz.AsyncEnricher, batch []rbn.Spot) {

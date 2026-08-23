@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/QuantaStream/radiosport-data-lab/internal/qrz"
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
 )
 
@@ -39,7 +40,8 @@ func main() {
 
 	client := rbn.LoaderClient{Target: *target}
 	ctx := context.Background()
-	batch := make([]rbn.SpotEvent, 0, *batchSize)
+	batch := make([]interface{}, 0, *batchSize)
+	seenQRZ := map[string]struct{}{}
 	var emitted, accepted, failed int
 	flush := func() error {
 		if len(batch) == 0 {
@@ -64,6 +66,15 @@ func main() {
 	stats, err := rbn.ReadArchiveCSVWithDate(reader, archiveDate, func(spot rbn.Spot) error {
 		if *limit > 0 && emitted >= *limit {
 			return errLimitReached
+		}
+		if _, ok := seenQRZ[spot.DXCall]; !ok {
+			seenQRZ[spot.DXCall] = struct{}{}
+			batch = append(batch, qrz.NewPendingProfileEvent(spot.DXCall))
+			if len(batch) >= *batchSize {
+				if err := flush(); err != nil {
+					return err
+				}
+			}
 		}
 		batch = append(batch, rbn.NewSpotEvent(spot))
 		emitted++

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/QuantaStream/radiosport-data-lab/internal/qrz"
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
 )
 
@@ -35,9 +36,16 @@ func main() {
 
 	encoder := json.NewEncoder(os.Stdout)
 	emitted := 0
+	seenQRZ := map[string]struct{}{}
 	stats, err := rbn.ReadArchiveCSVWithDate(reader, archiveDate, func(spot rbn.Spot) error {
 		if *limit > 0 && emitted >= *limit {
 			return errLimitReached
+		}
+		if _, ok := seenQRZ[spot.DXCall]; !ok {
+			seenQRZ[spot.DXCall] = struct{}{}
+			if err := encoder.Encode(qrz.NewPendingProfileEvent(spot.DXCall)); err != nil {
+				return err
+			}
 		}
 		if err := encoder.Encode(rbn.NewSpotEvent(spot)); err != nil {
 			return err

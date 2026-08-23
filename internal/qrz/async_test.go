@@ -25,7 +25,7 @@ func TestAsyncEnricherLooksUpAndStoresProfile(t *testing.T) {
 		t.Fatalf("profile was not stored: %#v", store.profiles)
 	}
 	stats := enricher.Stats()
-	if stats.Enqueued != 1 || stats.Found != 1 || stats.Inserted != 1 || stats.Errors != 0 {
+	if stats.Enqueued != 1 || stats.Found != 1 || stats.Inserted != 1 || stats.Updated != 1 || stats.Errors != 0 {
 		t.Fatalf("unexpected stats: %s", stats)
 	}
 }
@@ -48,7 +48,7 @@ func TestAsyncEnricherStoresNotFoundProfile(t *testing.T) {
 		t.Fatalf("lookup status=%q", profile.LookupStatus)
 	}
 	stats := enricher.Stats()
-	if stats.NotFound != 1 || stats.Inserted != 1 || stats.Errors != 0 {
+	if stats.NotFound != 1 || stats.Inserted != 1 || stats.Updated != 1 || stats.Errors != 0 {
 		t.Fatalf("unexpected stats: %s", stats)
 	}
 }
@@ -69,6 +69,28 @@ func TestAsyncEnricherSkipsCachedProfile(t *testing.T) {
 	}
 	stats := enricher.Stats()
 	if stats.Cached != 1 || stats.Inserted != 0 || stats.Errors != 0 {
+		t.Fatalf("unexpected stats: %s", stats)
+	}
+}
+
+func TestAsyncEnricherUpdatesPendingProfile(t *testing.T) {
+	store := newMemoryStore()
+	store.profiles["N7ZG"] = PendingProfile("N7ZG", time.Now())
+	lookup := &fakeLookup{profiles: map[string]Profile{
+		"N7ZG": {Callsign: "N7ZG", LookupStatus: "found"},
+	}}
+	enricher, err := NewAsyncEnricher(context.Background(), lookup, store, WithQueueSize(4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	enricher.Enqueue("N7ZG")
+	enricher.Stop()
+
+	if got := store.profiles["N7ZG"].LookupStatus; got != "found" {
+		t.Fatalf("lookup status=%q, want found", got)
+	}
+	stats := enricher.Stats()
+	if stats.Inserted != 0 || stats.Updated != 1 || stats.Found != 1 || stats.Errors != 0 {
 		t.Fatalf("unexpected stats: %s", stats)
 	}
 }
@@ -141,6 +163,24 @@ func (s *memoryStore) HasProfile(_ context.Context, call string) (bool, error) {
 }
 
 func (s *memoryStore) InsertProfile(_ context.Context, profile Profile) error {
+	s.profiles[profile.Callsign] = profile
+	return nil
+}
+
+func (s *memoryStore) LookupStatus(_ context.Context, call string) (string, bool, error) {
+	profile, ok := s.profiles[call]
+	return profile.LookupStatus, ok, nil
+}
+
+func (s *memoryStore) EnsurePendingProfile(_ context.Context, call string) (bool, error) {
+	if _, ok := s.profiles[call]; ok {
+		return false, nil
+	}
+	s.profiles[call] = PendingProfile(call, time.Now())
+	return true, nil
+}
+
+func (s *memoryStore) UpdateProfile(_ context.Context, profile Profile) error {
 	s.profiles[profile.Callsign] = profile
 	return nil
 }

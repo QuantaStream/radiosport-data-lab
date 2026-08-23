@@ -51,7 +51,7 @@ func main() {
 	}
 
 	var db *sql.DB
-	var stmt *sql.Stmt
+	var store qrz.SQLStore
 	if *insert {
 		db, err = sql.Open("mysql", *dsn)
 		if err != nil {
@@ -61,11 +61,7 @@ func main() {
 		if err := db.PingContext(ctx); err != nil {
 			log.Fatal(err)
 		}
-		stmt, err = db.PrepareContext(ctx, qrz.ProfileInsertSQL)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmt.Close()
+		store = qrz.SQLStore{DB: db}
 	}
 
 	encoder := json.NewEncoder(os.Stdout)
@@ -86,8 +82,8 @@ func main() {
 			log.Fatal(err)
 		}
 		lookedUp++
-		if stmt != nil {
-			if _, err := stmt.ExecContext(ctx, qrz.ProfileSQLArgs(profile)...); err != nil {
+		if db != nil {
+			if err := store.StoreProfile(ctx, profile); err != nil {
 				log.Fatal(err)
 			}
 			inserted++

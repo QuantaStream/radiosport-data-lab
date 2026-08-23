@@ -19,8 +19,9 @@ type ProfileLookup interface {
 }
 
 type ProfileStore interface {
-	HasProfile(context.Context, string) (bool, error)
-	InsertProfile(context.Context, Profile) error
+	LookupStatus(context.Context, string) (string, bool, error)
+	EnsurePendingProfile(context.Context, string) (bool, error)
+	UpdateProfile(context.Context, Profile) error
 }
 
 type AsyncEnricher struct {
@@ -42,6 +43,7 @@ type AsyncEnricher struct {
 	found    int64
 	notFound int64
 	inserted int64
+	updated  int64
 	errors   int64
 }
 
@@ -52,6 +54,7 @@ type AsyncEnricherStats struct {
 	Found    int64
 	NotFound int64
 	Inserted int64
+	Updated  int64
 	Errors   int64
 }
 
@@ -156,6 +159,7 @@ func (e *AsyncEnricher) Stats() AsyncEnricherStats {
 		Found:    atomic.LoadInt64(&e.found),
 		NotFound: atomic.LoadInt64(&e.notFound),
 		Inserted: atomic.LoadInt64(&e.inserted),
+		Updated:  atomic.LoadInt64(&e.updated),
 		Errors:   atomic.LoadInt64(&e.errors),
 	}
 }
@@ -176,14 +180,22 @@ func (e *AsyncEnricher) worker() {
 }
 
 func (e *AsyncEnricher) process(call string) {
-	exists, err := e.store.HasProfile(e.ctx, call)
+	status, exists, err := e.store.LookupStatus(e.ctx, call)
 	if err != nil {
 		e.recordError("qrz cache check call=%s err=%v", call, err)
 		return
 	}
-	if exists {
+	if exists && profileStatusComplete(status) {
 		atomic.AddInt64(&e.cached, 1)
 		return
+	}
+	inserted, err := e.store.EnsurePendingProfile(e.ctx, call)
+	if err != nil {
+		e.recordError("qrz pending insert call=%s err=%v", call, err)
+		return
+	}
+	if inserted {
+		atomic.AddInt64(&e.inserted, 1)
 	}
 
 	lookupCtx, cancel := context.WithTimeout(e.ctx, e.lookupTimeout)
@@ -202,11 +214,11 @@ func (e *AsyncEnricher) process(call string) {
 	if e.profileHook != nil {
 		e.profileHook(&profile)
 	}
-	if err := e.store.InsertProfile(e.ctx, profile); err != nil {
-		e.recordError("qrz cache insert call=%s err=%v", call, err)
+	if err := e.store.UpdateProfile(e.ctx, profile); err != nil {
+		e.recordError("qrz cache update call=%s err=%v", call, err)
 		return
 	}
-	atomic.AddInt64(&e.inserted, 1)
+	atomic.AddInt64(&e.updated, 1)
 }
 
 func (e *AsyncEnricher) recordError(format string, args ...interface{}) {
@@ -215,6 +227,10 @@ func (e *AsyncEnricher) recordError(format string, args ...interface{}) {
 }
 
 func (s AsyncEnricherStats) String() string {
-	return fmt.Sprintf("enqueued=%d dropped=%d cached=%d found=%d not_found=%d inserted=%d errors=%d",
-		s.Enqueued, s.Dropped, s.Cached, s.Found, s.NotFound, s.Inserted, s.Errors)
+	return fmt.Sprintf("enqueued=%d dropped=%d cached=%d found=%d not_found=%d inserted=%d updated=%d errors=%d",
+		s.Enqueued, s.Dropped, s.Cached, s.Found, s.NotFound, s.Inserted, s.Updated, s.Errors)
+}
+
+func profileStatusComplete(status string) bool {
+	return status == "found" || status == "not_found"
 }
