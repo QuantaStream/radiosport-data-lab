@@ -6,7 +6,7 @@ attributes:
   sourceName: /data/callsign
   mappingStrategy: StringLexBSI
   configuration:
-    length: "16"
+    length: "8"
   type: String
   maxLen: 16
   sourceOrdinal: 1

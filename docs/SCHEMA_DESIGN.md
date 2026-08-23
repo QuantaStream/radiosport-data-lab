@@ -24,8 +24,8 @@ callsign parser to add prefix, continent, and band metadata.
 | --- | --- | --- | --- |
 | `spot_id` | generated | `IntBSI` | Stable 63-bit hash, also `columnID`. |
 | `spotted_at` | `date` or telnet UTC minute | `TimestampBSI` | Time quantum field. |
-| `spotter_call` | `callsign` | `StringLexBSI length=16 maxLen=16` | Inline callsign, no KV remainder. |
-| `dx_call` | `dx` | `StringLexBSI length=16 maxLen=16` | Inline callsign, no KV remainder. |
+| `spotter_call` | `callsign` | `StringLexBSI length=8 maxLen=16` | Eight-byte lexical prefix keeps common callsigns in a compact BSI width; uncommon longer callsigns use backing-string rehydration for full projection. |
+| `dx_call` | `dx` | `StringLexBSI length=8 maxLen=16` | Prefix searches such as `LIKE 'N7%'` remain native BSI range predicates while avoiding the wider 16-byte BSI payload. |
 | `dx_call_ref` | `dx` | `ParentRelation -> qrz_callsigns` | Relationship vector for QS-native joins to QRZ enrichment rows. |
 | `spotter_prefix`, `dx_prefix` | archive or parser | `StringEnum` | Low-cardinality DXCC prefix. |
 | `spotter_continent`, `dx_continent` | archive or parser | `StringEnum` | Seven possible continent-style values. |
@@ -57,7 +57,8 @@ exist without a final QRZ profile, but supported ingesters create a lightweight
 relationship joins, cache warming, and background enrichment without blocking
 spot ingestion.
 
-The callsign key uses `StringLexBSI length=16 maxLen=16`. Other string fields are
+The callsign key uses `StringLexBSI length=8 maxLen=16` for the same compact
+prefix-BSI tradeoff as the spot callsign fields. Other string fields are
 `StringEnum` until the data tells us a particular QRZ attribute has high enough
 cardinality to deserve a different mapper.
 

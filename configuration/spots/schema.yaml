@@ -21,7 +21,7 @@ attributes:
   sourceName: /data/spotter_call
   mappingStrategy: StringLexBSI
   configuration:
-    length: "16"
+    length: "8"
   type: String
   maxLen: 16
   sourceOrdinal: 3
@@ -39,7 +39,7 @@ attributes:
   sourceName: /data/dx_call
   mappingStrategy: StringLexBSI
   configuration:
-    length: "16"
+    length: "8"
   type: String
   maxLen: 16
   sourceOrdinal: 6
