@@ -36,6 +36,19 @@ callsign parser to add prefix, continent, and band metadata.
 The archive uses kHz as a floating number. The ingester stores kHz with one
 decimal place so Workbench and ad hoc radio queries display the familiar value.
 
+### `spots_flat`
+
+`spots_flat` mirrors the spot fact columns but intentionally omits
+`dx_call_ref`. It exists as a loader-throughput comparison table for archive
+backfills where we want to measure raw spot ingestion without QRZ parent stubs,
+relationship-vector writes, or reverse relationship artifacts in the path.
+
+The table uses selector `type="rbn_spot_flat"`. Archive tools can target it with
+`-spot-type rbn_spot_flat -qrz-parents=false -dense-spot-ids`. The dense-id
+option is important for loader backfills because `spot_id` is the QS column ID:
+day-local contiguous IDs build compact bitmap artifacts, while stable hash IDs
+are intentionally sparse and are better treated as event identity.
+
 ### `qrz_callsigns`
 
 `qrz_callsigns` is an optional enrichment table keyed by callsign. A spot can

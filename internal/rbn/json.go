@@ -2,6 +2,11 @@ package rbn
 
 import "time"
 
+const (
+	DefaultSpotEventType = "rbn_spot"
+	FlatSpotEventType    = "rbn_spot_flat"
+)
+
 type SpotEvent struct {
 	Type string      `json:"type"`
 	Data SpotPayload `json:"data"`
@@ -26,8 +31,15 @@ type SpotPayload struct {
 }
 
 func NewSpotEvent(spot Spot) SpotEvent {
+	return NewSpotEventWithType(spot, DefaultSpotEventType)
+}
+
+func NewSpotEventWithType(spot Spot, eventType string) SpotEvent {
+	if eventType == "" {
+		eventType = DefaultSpotEventType
+	}
 	return SpotEvent{
-		Type: "rbn_spot",
+		Type: eventType,
 		Data: SpotPayload{
 			SpotID:           spot.SpotID,
 			SpottedAt:        spot.SpottedAt.UTC().Format(time.RFC3339),

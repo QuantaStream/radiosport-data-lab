@@ -11,6 +11,8 @@ const SourceArchive = "archive"
 
 const UnknownValue = "UNKNOWN"
 
+const archiveSpotIDDayStride uint64 = 10000000
+
 // Spot is the normalized event shape used by both archive and telnet ingestion.
 type Spot struct {
 	SpotID           uint64
@@ -72,6 +74,17 @@ func StableSpotID(s Spot) uint64 {
 	writePart(s.TransmitMode)
 	// Keep the synthetic key inside signed-int64 range for SQL driver portability.
 	return h.Sum64() & ((uint64(1) << 63) - 1)
+}
+
+func DenseArchiveSpotID(spottedAt time.Time, zeroBasedOrdinal int) uint64 {
+	if zeroBasedOrdinal < 0 {
+		zeroBasedOrdinal = 0
+	}
+	unixDay := spottedAt.UTC().Unix() / int64((24 * time.Hour).Seconds())
+	if unixDay < 0 {
+		unixDay = 0
+	}
+	return uint64(unixDay)*archiveSpotIDDayStride + uint64(zeroBasedOrdinal) + 1
 }
 
 func formatFrequencyKHz(freq float64) string {

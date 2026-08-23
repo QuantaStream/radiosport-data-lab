@@ -9,3 +9,8 @@ objects:
   object_type: TABLE
   creation_date: 2026-08-22T00:00:00Z
   modification_date: 2026-08-22T00:00:00Z
+- schema_name: quanta
+  table_name: spots_flat
+  object_type: TABLE
+  creation_date: 2026-08-23T00:00:00Z
+  modification_date: 2026-08-23T00:00:00Z

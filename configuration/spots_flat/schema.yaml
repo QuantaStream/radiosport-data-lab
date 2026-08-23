@@ -1,0 +1,91 @@
+tableName: spots_flat
+primaryKey: spot_id
+selector: type="rbn_spot_flat"
+timeQuantumType: YMD
+timeQuantumField: spotted_at
+attributes:
+- fieldName: spot_id
+  sourceName: /data/spot_id
+  mappingStrategy: IntBSI
+  type: Integer
+  columnID: true
+  sourceOrdinal: 1
+- fieldName: spotted_at
+  sourceName: /data/spotted_at
+  mappingStrategy: TimestampBSI
+  configuration:
+    granularity: "second"
+  type: DateTime
+  sourceOrdinal: 2
+- fieldName: spotter_call
+  sourceName: /data/spotter_call
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "16"
+  type: String
+  maxLen: 16
+  sourceOrdinal: 3
+- fieldName: spotter_prefix
+  sourceName: /data/spotter_prefix
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 4
+- fieldName: spotter_continent
+  sourceName: /data/spotter_continent
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 5
+- fieldName: dx_call
+  sourceName: /data/dx_call
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "16"
+  type: String
+  maxLen: 16
+  sourceOrdinal: 6
+- fieldName: dx_prefix
+  sourceName: /data/dx_prefix
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 7
+- fieldName: dx_continent
+  sourceName: /data/dx_continent
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 8
+- fieldName: frequency_khz
+  sourceName: /data/frequency_khz
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 1
+  sourceOrdinal: 9
+- fieldName: band
+  sourceName: /data/band
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 10
+- fieldName: mode
+  sourceName: /data/mode
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 11
+- fieldName: signal_db
+  sourceName: /data/signal_db
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 12
+- fieldName: speed_wpm
+  sourceName: /data/speed_wpm
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 13
+- fieldName: transmit_mode
+  sourceName: /data/transmit_mode
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 14
+- fieldName: source
+  sourceName: /data/source
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 15

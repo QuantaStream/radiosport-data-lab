@@ -31,7 +31,9 @@ should use prepared SQL inserts with sensible batching.
 
 The SQL ingester can insert the inner `data` fields directly. The streaming
 loader should emit the full object so `selector: type="rbn_spot"` can route the
-event to the `spots` table.
+event to the `spots` table. Loader-only flat backfills can instead emit
+`type="rbn_spot_flat"` to target `spots_flat`, a relationship-free copy of the
+spot fact shape.
 
 `spots.dx_call_ref` is a relationship-vector field that reuses `/data/dx_call`
 and points at `qrz_callsigns.callsign`. Ingesters must create a pending QRZ
@@ -131,7 +133,7 @@ Use this path for daily CSV archives and large historical backfills. SQL inserts
 are useful for compatibility, but the loader should be the expected throughput
 path for multi-year data.
 
-Initial target:
+Relationship-table target:
 
 1. Parse archive records into the normalized payload.
 2. Emit one pending `qrz_callsign` event before the first spot for each DX call.
@@ -149,6 +151,41 @@ go run ./cmd/rbn-archive-load \
   -batch-size 1000 \
   /tmp/rbn-data/20260821.zip
 ```
+
+Flat loader-throughput run:
+
+```bash
+go run ./cmd/rbn-archive-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 1000 \
+  -spot-type rbn_spot_flat \
+  -qrz-parents=false \
+  -dense-spot-ids \
+  /tmp/rbn-data/20260821.zip
+```
+
+Use the flat path when the goal is measuring archive loader throughput without
+relationship-vector or QRZ-cache work. Use the normal `rbn_spot` path when the
+goal is exercising the full relationship-aware application model.
+
+Archive backfills should use dense archive spot IDs when the target table marks
+`spot_id` as `columnID: true`. The parser's stable hash remains useful for
+event identity, but sparse hash values are a poor physical column-id shape for
+bitmap storage. Dense archive IDs are allocated in day-local contiguous ranges
+so one daily file builds compact storage artifacts and multiple days do not
+collide.
+
+Local flat-loader matrix:
+
+```bash
+RBN_LOAD_LIMIT=50000 \
+./scripts/run-local-flat-loader-matrix.sh /tmp/rbn-data/20260821.zip \
+  1:1000 2:1000 4:1000 8:1000
+```
+
+Each matrix entry starts a clean temporary QuantaStream-in-a-box server and a
+loader pointed only at `spots_flat`, then records rows/sec in
+`/tmp/radiosport-flat-loader-matrix.tsv`.
 
 ## QRZ Enrichment
 

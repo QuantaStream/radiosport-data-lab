@@ -18,6 +18,9 @@ func main() {
 	log.SetFlags(0)
 
 	limit := flag.Int("limit", 0, "maximum records to emit; 0 means no limit")
+	spotType := flag.String("spot-type", rbn.DefaultSpotEventType, "event type used for spot records")
+	qrzParents := flag.Bool("qrz-parents", true, "emit pending qrz_callsign parent events before spots")
+	denseSpotIDs := flag.Bool("dense-spot-ids", false, "assign day-local dense spot ids for storage-friendly archive backfills")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: rbn-archive-to-jsonl [flags] <RBN daily .zip or .csv>\n")
 		flag.PrintDefaults()
@@ -41,13 +44,18 @@ func main() {
 		if *limit > 0 && emitted >= *limit {
 			return errLimitReached
 		}
-		if _, ok := seenQRZ[spot.DXCall]; !ok {
-			seenQRZ[spot.DXCall] = struct{}{}
-			if err := encoder.Encode(qrz.NewPendingProfileEvent(spot.DXCall)); err != nil {
-				return err
+		if *qrzParents {
+			if _, ok := seenQRZ[spot.DXCall]; !ok {
+				seenQRZ[spot.DXCall] = struct{}{}
+				if err := encoder.Encode(qrz.NewPendingProfileEvent(spot.DXCall)); err != nil {
+					return err
+				}
 			}
 		}
-		if err := encoder.Encode(rbn.NewSpotEvent(spot)); err != nil {
+		if *denseSpotIDs {
+			spot.SpotID = rbn.DenseArchiveSpotID(spot.SpottedAt, emitted)
+		}
+		if err := encoder.Encode(rbn.NewSpotEventWithType(spot, *spotType)); err != nil {
 			return err
 		}
 		emitted++

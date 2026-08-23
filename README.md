@@ -19,6 +19,7 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
+- `docs/LOADER_BENCHMARK_20260823.md` records the local flat-loader baseline.
 
 ## Data Sources
 
@@ -63,6 +64,11 @@ frequency in display-friendly kHz, and computes a stable synthetic `spot_id`.
 Archive and live ingesters create pending QRZ parent rows before spots so
 `spots.dx_call_ref` can exercise QS-native relationship joins; async QRZ
 enrichment updates those rows later.
+
+For loader pipeline tests, `spots_flat` provides the same spot fact shape without
+the QRZ relationship vector. Use `rbn-archive-load -spot-type rbn_spot_flat
+-qrz-parents=false -dense-spot-ids` to isolate raw archive ingestion throughput
+with storage-friendly day-local column IDs.
 
 ## Near-Term Build Plan
 
