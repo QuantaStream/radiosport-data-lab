@@ -87,7 +87,7 @@ Initial SQL run:
 
 ```bash
 go run ./cmd/rbn-telnet-sql-ingest \
-  -mysql-dsn 'MOLIG004@tcp(127.0.0.1:4000)/quanta' \
+  -mysql-dsn 'qstream@tcp(127.0.0.1:4000)/quanta' \
   -batch-size 5 \
   -batch-interval 5s
 ```
@@ -113,7 +113,7 @@ Optional QRZ cache enrichment:
 ```bash
 QRZ_USERNAME=... QRZ_PASSWORD=... \
 go run ./cmd/rbn-telnet-sql-ingest \
-  -mysql-dsn 'MOLIG004@tcp(127.0.0.1:4000)/quanta' \
+  -mysql-dsn 'qstream@tcp(127.0.0.1:4000)/quanta' \
   -cty-dat data/cty/cty.dat \
   -qrz-enrich \
   -qrz-queue-size 256 \
@@ -244,7 +244,7 @@ Cache profiles into QuantaStream:
 QRZ_USERNAME=... QRZ_PASSWORD=... \
 go run ./cmd/rbn-qrz-lookup \
   -insert \
-  -mysql-dsn 'MOLIG004@tcp(127.0.0.1:4000)/quanta' \
+  -mysql-dsn 'qstream@tcp(127.0.0.1:4000)/quanta' \
   -cty-dat data/cty/cty.dat \
   N7ZG K1ABC
 ```

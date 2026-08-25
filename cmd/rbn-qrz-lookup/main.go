@@ -20,7 +20,7 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
-	dsn := flag.String("mysql-dsn", "MOLIG004@tcp(127.0.0.1:4000)/quanta", "MySQL-compatible DSN for QuantaStream")
+	dsn := flag.String("mysql-dsn", "qstream@tcp(127.0.0.1:4000)/quanta", "MySQL-compatible DSN for QuantaStream")
 	insert := flag.Bool("insert", false, "insert lookup rows into qrz_callsigns")
 	ctyPath := flag.String("cty-dat", "", "optional CTY.DAT path; defaults to RBN_CTY_DAT or data/cty/cty.dat")
 	requireCTY := flag.Bool("require-cty", false, "fail startup if CTY.DAT cannot be loaded")

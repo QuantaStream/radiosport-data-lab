@@ -26,7 +26,7 @@ func main() {
 
 	rbnAddr := flag.String("rbn-addr", "telnet.reversebeacon.net:7000", "RBN telnet address")
 	loginCall := flag.String("login-call", "N7ZG", "callsign sent to the RBN telnet login prompt")
-	dsn := flag.String("mysql-dsn", "MOLIG004@tcp(127.0.0.1:4000)/quanta", "MySQL-compatible DSN for QuantaStream")
+	dsn := flag.String("mysql-dsn", "qstream@tcp(127.0.0.1:4000)/quanta", "MySQL-compatible DSN for QuantaStream")
 	batchSize := flag.Int("batch-size", rbn.DefaultTelnetBatchSize, "records per SQL flush")
 	batchInterval := flag.Duration("batch-interval", rbn.DefaultTelnetBatchInterval, "maximum delay before flushing a non-empty batch")
 	limit := flag.Int("limit", 0, "maximum spots to insert; 0 means no limit")
