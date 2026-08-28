@@ -20,6 +20,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
   events for daily and three-hour propagation tables.
 - `cmd/cabrillo-load` parses public Cabrillo contest logs and emits
   `contest_logs`, `activity_5m_buckets`, and `contest_qsos` loader events.
+- `cmd/contest-spot-match-load` materializes QSO-to-RBN spot matches from a
+  Cabrillo log and matching RBN archive files.
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
@@ -58,6 +60,7 @@ go run ./cmd/rbn-telnet-sql-ingest -dry-run -limit 10
 go run ./cmd/rbn-update-cty
 go run ./cmd/swpc-load -from 2026-08-21 -to 2026-08-21 > /tmp/swpc-20260821.jsonl
 go run ./cmd/cabrillo-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log > /tmp/ti8x-contest.jsonl
+go run ./cmd/contest-spot-match-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log /tmp/rbn-data/20251129.zip /tmp/rbn-data/20251130.zip > /tmp/ti8x-matches.jsonl
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-telnet-sql-ingest -qrz-enrich
 ```
@@ -144,6 +147,14 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_rbn_activity_5m_base.sql
 ```
 
+Install the exact materialized match view after `contest_spot_matches` is
+loaded:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_spot_match_base.sql
+```
+
 Load a single Cabrillo contest log through the JSON loader:
 
 ```bash
@@ -188,6 +199,30 @@ from contest_rbn_activity_5m_base
 where station_call = 'TI8X'
 group by activity_5m_key, activity_band
 order by qso_spot_pairs desc
+limit 20;
+```
+
+Materialize exact QSO-to-spot matches for the focused TI8X reload:
+
+```bash
+go run ./cmd/contest-spot-match-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 1000 \
+  -cty-dat data/cty/cty.dat \
+  -dense-spot-ids \
+  https://cqww.com/publiclogs/2025cw/ti8x.log \
+  /tmp/rbn-data/20251129.zip \
+  /tmp/rbn-data/20251130.zip
+```
+
+Exact match smoke:
+
+```sql
+select band, match_kind, count(*) as matches
+from contest_spot_match_base
+where station_call = 'TI8X'
+group by band, match_kind
+order by matches desc
 limit 20;
 ```
 

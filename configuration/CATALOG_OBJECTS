@@ -39,3 +39,8 @@ objects:
   object_type: TABLE
   creation_date: 2026-08-28T00:00:00Z
   modification_date: 2026-08-28T00:00:00Z
+- schema_name: quanta
+  table_name: contest_spot_matches
+  object_type: TABLE
+  creation_date: 2026-08-28T00:00:00Z
+  modification_date: 2026-08-28T00:00:00Z

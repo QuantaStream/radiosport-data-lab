@@ -196,6 +196,53 @@ limit 20;
 
 Directly joining `contest_qsos` to `spots_flat` on `activity_5m_id` remains a
 non-relationship peer-table join and is rejected by QS today. Use
-`activity_5m_buckets` or `contest_rbn_activity_5m_base` for the native path.
-A future materialized match table can add exact time-delta and frequency-delta
-semantics when bucket-level correlation is not enough.
+`activity_5m_buckets` or `contest_rbn_activity_5m_base` for the native bucket
+path.
+
+## `contest_spot_match_base`
+
+`contest_spot_match_base` is the exact match view over materialized
+`contest_spot_matches` rows. It is the richer analysis surface when five-minute
+bucket correlation is not enough because it includes time delta, frequency
+delta, signal, spotter, and SWPC context.
+
+Create or refresh the view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_spot_match_base.sql
+```
+
+Useful smoke query:
+
+```sql
+select
+  band,
+  match_kind,
+  count(*) as matches
+from contest_spot_match_base
+where station_call = 'TI8X'
+group by band, match_kind
+order by matches desc
+limit 20;
+```
+
+Closest spotter examples:
+
+```sql
+select
+  match_id,
+  qso_id,
+  spot_id,
+  qso_at,
+  spotted_at,
+  time_delta_seconds,
+  abs_frequency_delta_khz,
+  spotter_call,
+  signal_db
+from contest_spot_match_base
+where station_call = 'TI8X'
+  and abs_time_delta_seconds <= 60
+order by signal_db desc
+limit 30;
+```

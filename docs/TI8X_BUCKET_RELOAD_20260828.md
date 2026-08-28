@@ -132,6 +132,54 @@ Observed leading buckets:
 | `TI8X|40M|CW|202511290145` | `40M` | 560 |
 | `TI8X|10M|CW|202511301550` | `10M` | 477 |
 
+Exact materialized match load:
+
+```bash
+go run ./cmd/contest-spot-match-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 1000 \
+  -cty-dat data/cty/cty.dat \
+  -window 5m \
+  https://cqww.com/publiclogs/2025cw/ti8x.log \
+  /tmp/rbn-data/20251129.zip \
+  /tmp/rbn-data/20251130.zip
+```
+
+Result: `qsos=3947`, `spots=5423`, `matches=81248`, `accepted=81248`,
+`failed=0`. Loader stats after the run showed `queued=0`, `records=81248`,
+`flushes=36`, and `flush_errors=0`.
+
+Exact match smoke:
+
+```sql
+select band, match_kind, count(*) as matches
+from contest_spot_match_base
+where station_call = 'TI8X'
+group by band, match_kind
+order by matches desc
+limit 20;
+```
+
+Closest spotter sample:
+
+```sql
+select
+  match_id,
+  qso_id,
+  spot_id,
+  qso_at,
+  spotted_at,
+  time_delta_seconds,
+  abs_frequency_delta_khz,
+  spotter_call,
+  signal_db
+from contest_spot_match_base
+where station_call = 'TI8X'
+  and abs_time_delta_seconds <= 60
+order by signal_db desc
+limit 30;
+```
+
 ## Product Notes
 
 - `-dx-call` made focused two-day contest reloads quick while still reading the
@@ -142,9 +190,8 @@ Observed leading buckets:
   still a non-relationship peer join and is rejected by QS. The implemented
   native path is `activity_5m_buckets`, exposed through
   `contest_rbn_activity_5m_base`.
-- Exact spot-to-QSO matching remains a future materialized-analysis feature when
-  we want time-delta, frequency-delta, and confidence columns instead of coarse
-  five-minute bucket correlation.
+- Exact spot-to-QSO matching is now represented by `contest_spot_matches`;
+  future work can add richer scoring beyond the first pass.
 - `CREATE VIEW` stores view definitions under the data directory, but this run
   used an external schema directory at startup. The views had to be reinstalled
   after restart, so QS should clarify or improve view bootstrap when runtime

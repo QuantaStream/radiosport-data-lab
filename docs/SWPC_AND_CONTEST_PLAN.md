@@ -222,6 +222,10 @@ Spot-to-QSO five-minute matching should use `activity_5m_buckets` or the
 `contest_qsos` on scalar `activity_5m_id` remains a non-relationship peer-table
 join and is intentionally not the preferred QS modeling path.
 
+Exact spot-to-QSO matching is materialized into `contest_spot_matches`. This
+table records the QSO row, RBN spot row, time delta, frequency delta, and match
+classification after a reproducible source-file matching pass.
+
 ## Product Improvements Seen During Reload
 
 - Loader parent/child backfills need an explicit flush or drain barrier. The
@@ -233,9 +237,9 @@ join and is intentionally not the preferred QS modeling path.
 - Bucketed correlation now has a first-class modeling pattern. Shared activity
   buckets turn useful peer-table comparisons into native relationship-vector
   joins.
-- Exact spot-to-QSO matching will eventually want a materialized match table
-  that records time delta, frequency delta, and confidence. The shared bucket is
-  the fast coarse match layer.
+- Exact spot-to-QSO matching belongs in a materialized table that records time
+  delta, frequency delta, and match classification. The shared bucket is the
+  fast coarse match layer.
 
 ## Source References
 

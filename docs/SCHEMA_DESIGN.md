@@ -241,6 +241,29 @@ submitted log and SWPC time buckets.
 | `sent_exchange`, `received_exchange` | QSO line | `StringEnum` | Contest exchange values. |
 | `source_file` | ingester | `StringLexBSI length=16 maxLen=160` | Source artifact identity. |
 
+### `contest_spot_matches`
+
+`contest_spot_matches` is the exact materialized analysis table for comparing
+submitted QSOs with RBN spots. The shared `activity_5m_buckets` parent is the
+fast coarse layer; this table preserves the exact spot/QSO pairs that passed a
+matching policy and carries the deltas analysts need to evaluate them.
+
+| Column | Source | Mapper | Notes |
+| --- | --- | --- | --- |
+| `match_id` | generated | `IntBSI` | Dense primary key and column ID for compact storage. |
+| `contest_id` | QSO | `StringEnum` | Contest identity. |
+| `log_id` | QSO | `ParentRelation -> contest_logs` | Submitted log parent. |
+| `qso_ref` | QSO | `ParentRelation -> contest_qsos` | Matched QSO row. |
+| `spot_ref` | RBN spot | `ParentRelation -> spots_flat` | Matched RBN spot row. |
+| `qso_activity_5m_ref`, `spot_activity_5m_ref` | derived hashes | `ParentRelation -> activity_5m_buckets` | Links each side back to its five-minute bucket. |
+| `station_call`, `worked_call`, `spotter_call` | QSO/spot | `StringLexBSI length=8 maxLen=16` | Identifier fields. |
+| `station_prefix`, `worked_prefix`, `spotter_prefix`, `dx_prefix` | parser/archive | `StringEnum` | Contest and RBN geography. |
+| `station_continent`, `worked_continent`, `spotter_continent`, `dx_continent` | parser/archive | `StringEnum` | Geographic rollups. |
+| `band`, `mode`, `match_kind`, `source` | derived | `StringEnum` | Core dimensions and match classification. |
+| `qso_at`, `spotted_at`, `loaded_at` | QSO/spot/loader | `TimestampBSI` | Time fields. |
+| `qso_frequency_khz`, `spot_frequency_khz`, `frequency_delta_khz`, `abs_frequency_delta_khz` | QSO/spot | `FloatScaleBSI scale=1` | Frequency comparison. |
+| `time_delta_seconds`, `abs_time_delta_seconds`, `signal_db`, `speed_wpm`, `match_window_seconds`, `same_activity_bucket` | derived/spot | `IntBSI` | Match scoring and filter values. |
+
 ## Enrichment Failure Rule
 
 CTY/DXCC enrichment is local file data. The app looks for `RBN_CTY_DAT` first,

@@ -1,0 +1,50 @@
+create or replace view contest_spot_match_base as
+select
+  m.match_id as match_id,
+  m.contest_id as contest_id,
+  m.log_id as log_id,
+  m.qso_ref as qso_id,
+  m.spot_ref as spot_id,
+  m.station_call as station_call,
+  m.station_prefix as station_prefix,
+  m.station_continent as station_continent,
+  m.worked_call as worked_call,
+  m.worked_prefix as worked_prefix,
+  m.worked_continent as worked_continent,
+  m.spotter_call as spotter_call,
+  m.spotter_prefix as spotter_prefix,
+  m.spotter_continent as spotter_continent,
+  m.dx_prefix as dx_prefix,
+  m.dx_continent as dx_continent,
+  m.band as band,
+  m.mode as mode,
+  m.qso_at as qso_at,
+  m.spotted_at as spotted_at,
+  m.qso_frequency_khz as qso_frequency_khz,
+  m.spot_frequency_khz as spot_frequency_khz,
+  m.time_delta_seconds as time_delta_seconds,
+  m.abs_time_delta_seconds as abs_time_delta_seconds,
+  m.frequency_delta_khz as frequency_delta_khz,
+  m.abs_frequency_delta_khz as abs_frequency_delta_khz,
+  m.signal_db as signal_db,
+  m.speed_wpm as speed_wpm,
+  m.match_window_seconds as match_window_seconds,
+  m.frequency_tolerance_khz as frequency_tolerance_khz,
+  m.same_activity_bucket as same_activity_bucket,
+  m.match_kind as match_kind,
+  q.worked_call as qso_worked_call,
+  s.spotter_call as rbn_spotter_call,
+  d.sfi as sfi,
+  d.a_index as a_index,
+  d.ap_index as ap_index,
+  k.k_index as k_index,
+  k.kp_index as kp_index
+from contest_spot_matches as m
+inner join contest_qsos as q
+  on m.qso_ref = q.qso_id
+inner join spots_flat as s
+  on m.spot_ref = s.spot_id
+inner join swpc_daily_indices as d
+  on q.qso_day_key = d.day_key
+inner join swpc_k_indices_3h as k
+  on q.qso_3h_bucket_key = k.bucket_key;
