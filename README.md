@@ -13,6 +13,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/rbn-inspect` profiles an RBN daily archive and verifies the parser.
 - `cmd/rbn-archive-to-jsonl` emits streaming-loader-ready JSONL from archives.
 - `cmd/rbn-archive-load` POSTs archive batches to a running `qstream-loader`.
+- `cmd/rbn-cache-build` builds focused parsed RBN day/callsign caches from
+  archive files for repeatable contest matching.
 - `cmd/rbn-telnet-sql-ingest` batches live telnet spots into prepared SQL inserts.
 - `cmd/rbn-update-cty` refreshes local CTY/DXCC data for telnet enrichment.
 - `cmd/rbn-qrz-lookup` fetches optional QRZ profiles and can cache them in SQL.
@@ -56,11 +58,12 @@ go test ./...
 go run ./cmd/rbn-inspect /tmp/rbn-data/20260821.zip
 go run ./cmd/rbn-archive-to-jsonl /tmp/rbn-data/20260821.zip > /tmp/rbn-spots.jsonl
 go run ./cmd/rbn-archive-load -target http://127.0.0.1:8088/ingest/json /tmp/rbn-data/20260821.zip
+go run ./cmd/rbn-cache-build -cache-dir /tmp/rbn-cache-ti8x -dx-call TI8X /tmp/rbn-data/20251129.zip /tmp/rbn-data/20251130.zip
 go run ./cmd/rbn-telnet-sql-ingest -dry-run -limit 10
 go run ./cmd/rbn-update-cty
 go run ./cmd/swpc-load -from 2026-08-21 -to 2026-08-21 > /tmp/swpc-20260821.jsonl
 go run ./cmd/cabrillo-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log > /tmp/ti8x-contest.jsonl
-go run ./cmd/contest-spot-match-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log /tmp/rbn-data/20251129.zip /tmp/rbn-data/20251130.zip > /tmp/ti8x-matches.jsonl
+go run ./cmd/contest-spot-match-load -target "" -rbn-cache /tmp/rbn-cache-ti8x https://cqww.com/publiclogs/2025cw/ti8x.log 2025-11-29 2025-11-30 > /tmp/ti8x-matches.jsonl
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-telnet-sql-ingest -qrz-enrich
 ```
@@ -205,15 +208,29 @@ limit 20;
 Materialize exact QSO-to-spot matches for the focused TI8X reload:
 
 ```bash
+go run ./cmd/rbn-cache-build \
+  -cache-dir /tmp/rbn-cache-ti8x \
+  -dx-call TI8X \
+  -dense-spot-ids \
+  /tmp/rbn-data/20251129.zip \
+  /tmp/rbn-data/20251130.zip
+
 go run ./cmd/contest-spot-match-load \
   -target http://127.0.0.1:8088/ingest/json \
   -batch-size 1000 \
   -cty-dat data/cty/cty.dat \
+  -rbn-cache /tmp/rbn-cache-ti8x \
   -dense-spot-ids \
   https://cqww.com/publiclogs/2025cw/ti8x.log \
-  /tmp/rbn-data/20251129.zip \
-  /tmp/rbn-data/20251130.zip
+  2025-11-29 \
+  2025-11-30
 ```
+
+The cache stores parsed spot JSONL by UTC day and DX callsign, so repeated
+match-policy experiments do not rescan multi-million-row archive files. Build
+the cache with the same focused `-dx-call` and dense-ID setting used for the
+`spots_flat` load when `contest_spot_matches.spot_ref` should point back to
+already loaded spot rows.
 
 Exact match smoke:
 

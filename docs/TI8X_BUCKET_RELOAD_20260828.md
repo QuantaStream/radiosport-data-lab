@@ -135,19 +135,33 @@ Observed leading buckets:
 Exact materialized match load:
 
 ```bash
+go run ./cmd/rbn-cache-build \
+  -cache-dir /tmp/rbn-cache-ti8x \
+  -dx-call TI8X \
+  -dense-spot-ids \
+  /tmp/rbn-data/20251129.zip \
+  /tmp/rbn-data/20251130.zip
+
 go run ./cmd/contest-spot-match-load \
   -target http://127.0.0.1:8088/ingest/json \
   -batch-size 1000 \
   -cty-dat data/cty/cty.dat \
+  -rbn-cache /tmp/rbn-cache-ti8x \
   -window 5m \
   https://cqww.com/publiclogs/2025cw/ti8x.log \
-  /tmp/rbn-data/20251129.zip \
-  /tmp/rbn-data/20251130.zip
+  2025-11-29 \
+  2025-11-30
 ```
 
 Result: `qsos=3947`, `spots=5423`, `matches=81248`, `accepted=81248`,
 `failed=0`. Loader stats after the run showed `queued=0`, `records=81248`,
 `flushes=36`, and `flush_errors=0`.
+
+The first raw archive scan built `/tmp/rbn-cache-ti8x` in about 18 seconds after
+reading 12,459,223 archive rows and caching the 5,423 TI8X spots. The
+cache-backed match pass then produced the same 81,248 exact matches in about
+1.8 seconds, which makes match-policy tuning practical without repeatedly
+rescanning the large CQWW RBN files.
 
 Exact match smoke:
 
@@ -192,6 +206,9 @@ limit 30;
   `contest_rbn_activity_5m_base`.
 - Exact spot-to-QSO matching is now represented by `contest_spot_matches`;
   future work can add richer scoring beyond the first pass.
+- Focused parsed RBN caches are the right middle layer for iterative contest
+  analysis. They preserve the dense spot IDs used by focused archive loads and
+  let match jobs rerun from day/callsign JSONL instead of scanning raw zips.
 - `CREATE VIEW` stores view definitions under the data directory, but this run
   used an external schema directory at startup. The views had to be reinstalled
   after restart, so QS should clarify or improve view bootstrap when runtime

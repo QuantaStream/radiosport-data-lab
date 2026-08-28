@@ -226,6 +226,13 @@ Exact spot-to-QSO matching is materialized into `contest_spot_matches`. This
 table records the QSO row, RBN spot row, time delta, frequency delta, and match
 classification after a reproducible source-file matching pass.
 
+Focused RBN parsed caches are now the preferred input for iterative exact-match
+jobs. `cmd/rbn-cache-build` scans raw RBN archives once for the submitted
+station call and writes cache files under
+`<cache-dir>/YYYY/MM/DD/by_dx_call/<CALL>.jsonl`. `cmd/contest-spot-match-load`
+can then use `-rbn-cache` with date arguments, preserving dense spot IDs without
+rescanning multi-million-row archive files for every match-policy change.
+
 ## Product Improvements Seen During Reload
 
 - Loader parent/child backfills need an explicit flush or drain barrier. The
@@ -234,6 +241,9 @@ classification after a reproducible source-file matching pass.
 - Selective archive backfills are valuable. `-dx-call` keeps focused contest
   reloads fast enough for iterative analysis even when the source files contain
   millions of unrelated RBN spots.
+- A parsed day/callsign cache turns focused reloads into repeatable analysis
+  input. This is a practical bridge between raw historical RBN files and future
+  loader-side materialized match jobs.
 - Bucketed correlation now has a first-class modeling pattern. Shared activity
   buckets turn useful peer-table comparisons into native relationship-vector
   joins.

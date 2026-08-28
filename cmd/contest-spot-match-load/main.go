@@ -17,6 +17,7 @@ import (
 	"github.com/QuantaStream/radiosport-data-lab/internal/callsign"
 	"github.com/QuantaStream/radiosport-data-lab/internal/contestmatch"
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
+	"github.com/QuantaStream/radiosport-data-lab/internal/rbncache"
 )
 
 func main() {
@@ -29,6 +30,7 @@ func main() {
 	contestID := flag.String("contest-id", "", "contest id override; empty derives from Cabrillo CONTEST and QSO year")
 	scopeRegion := flag.String("scope-region", "tier1", "scope label stored on parsed contest rows")
 	sourceFile := flag.String("source-file", "", "source label override for Cabrillo parsing")
+	rbnCache := flag.String("rbn-cache", "", "RBN parsed cache root; when set, RBN arguments are YYYY-MM-DD or YYYYMMDD cache days")
 	window := flag.Duration("window", 5*time.Minute, "spot/QSO match window on each side of the QSO time")
 	frequencyToleranceKHz := flag.Float64("frequency-tolerance-khz", 0, "maximum absolute frequency delta; 0 disables frequency filtering")
 	maxMatchesPerQSO := flag.Int("max-matches-per-qso", 0, "maximum closest spot matches per QSO; 0 keeps all matches")
@@ -36,6 +38,7 @@ func main() {
 	denseMatchIDs := flag.Bool("dense-match-ids", true, "assign contiguous match_id values for compact QS storage")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: contest-spot-match-load [flags] <Cabrillo log path or URL> <RBN daily .zip or .csv> [...]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "       contest-spot-match-load -rbn-cache <cache-dir> [flags] <Cabrillo log path or URL> <YYYY-MM-DD> [...]\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -66,7 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	spots, archiveStats, err := loadArchiveSpots(ctx, flag.Args()[1:], contestLog.StationCall, *denseSpotIDs)
+	spots, sourceStats, err := loadSpotSources(ctx, flag.Args()[1:], contestLog.StationCall, *denseSpotIDs, *rbnCache)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,8 +86,8 @@ func main() {
 		if err := writeJSONL(os.Stdout, events); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Fprintf(os.Stderr, "log_id=%s station=%s qsos=%d archive_rows=%d spots=%d matches=%d emitted=%d rejected=%d skipped_footer=%d\n",
-			contestLog.LogID, contestLog.StationCall, len(qsos), archiveStats.Rows, len(spots), len(matches), len(events), archiveStats.RejectedRows, archiveStats.SkippedFooter)
+		fmt.Fprintf(os.Stderr, "log_id=%s station=%s qsos=%d spot_source=%s source_rows=%d spots=%d matches=%d emitted=%d rejected=%d skipped_footer=%d\n",
+			contestLog.LogID, contestLog.StationCall, len(qsos), sourceStats.Source, sourceStats.Rows, len(spots), len(matches), len(events), sourceStats.RejectedRows, sourceStats.SkippedFooter)
 		return
 	}
 
@@ -92,14 +95,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Fprintf(os.Stderr, "log_id=%s station=%s qsos=%d archive_rows=%d spots=%d matches=%d accepted=%d failed=%d rejected=%d skipped_footer=%d\n",
-		contestLog.LogID, contestLog.StationCall, len(qsos), archiveStats.Rows, len(spots), len(matches), accepted, failed, archiveStats.RejectedRows, archiveStats.SkippedFooter)
+	fmt.Fprintf(os.Stderr, "log_id=%s station=%s qsos=%d spot_source=%s source_rows=%d spots=%d matches=%d accepted=%d failed=%d rejected=%d skipped_footer=%d\n",
+		contestLog.LogID, contestLog.StationCall, len(qsos), sourceStats.Source, sourceStats.Rows, len(spots), len(matches), accepted, failed, sourceStats.RejectedRows, sourceStats.SkippedFooter)
 	if failed > 0 {
 		os.Exit(1)
 	}
 }
 
-type aggregateArchiveStats struct {
+type spotSourceStats struct {
+	Source        string
 	Rows          int
 	RejectedRows  int
 	SkippedFooter int
@@ -131,9 +135,16 @@ func loadContestLog(ctx context.Context, source string, timeout time.Duration, s
 	return contestLog, qsos, nil
 }
 
-func loadArchiveSpots(ctx context.Context, paths []string, stationCall string, denseSpotIDs bool) ([]rbn.Spot, aggregateArchiveStats, error) {
+func loadSpotSources(ctx context.Context, args []string, stationCall string, denseSpotIDs bool, cacheDir string) ([]rbn.Spot, spotSourceStats, error) {
+	if strings.TrimSpace(cacheDir) != "" {
+		return loadCachedSpots(ctx, cacheDir, args, stationCall)
+	}
+	return loadArchiveSpots(ctx, args, stationCall, denseSpotIDs)
+}
+
+func loadArchiveSpots(ctx context.Context, paths []string, stationCall string, denseSpotIDs bool) ([]rbn.Spot, spotSourceStats, error) {
 	var allSpots []rbn.Spot
-	var aggregate aggregateArchiveStats
+	aggregate := spotSourceStats{Source: "archive"}
 	for _, path := range paths {
 		reader, archiveDate, err := rbn.OpenArchiveFile(path)
 		if err != nil {
@@ -168,6 +179,34 @@ func loadArchiveSpots(ctx context.Context, paths []string, stationCall string, d
 		aggregate.SkippedFooter += stats.SkippedFooter
 		fmt.Fprintf(os.Stderr, "archive=%s rows=%d matched_spots=%d rejected=%d skipped_footer=%d\n",
 			path, stats.Rows, emitted, stats.RejectedRows, stats.SkippedFooter)
+	}
+	return allSpots, aggregate, nil
+}
+
+func loadCachedSpots(ctx context.Context, cacheDir string, dayArgs []string, stationCall string) ([]rbn.Spot, spotSourceStats, error) {
+	if len(dayArgs) == 0 {
+		return nil, spotSourceStats{}, fmt.Errorf("at least one cache day is required when -rbn-cache is set")
+	}
+	call, ok := rbn.NormalizeCallsign(stationCall)
+	if !ok {
+		return nil, spotSourceStats{}, fmt.Errorf("invalid station callsign %q", stationCall)
+	}
+
+	var allSpots []rbn.Spot
+	aggregate := spotSourceStats{Source: "rbn-cache"}
+	for _, dayArg := range dayArgs {
+		day, err := rbncache.ParseCacheDay(dayArg)
+		if err != nil {
+			return nil, aggregate, err
+		}
+		spots, stats, err := rbncache.ReadCallSpots(ctx, cacheDir, day, call)
+		if err != nil {
+			return nil, aggregate, err
+		}
+		allSpots = append(allSpots, spots...)
+		aggregate.Rows += stats.Records
+		fmt.Fprintf(os.Stderr, "cache_day=%s call=%s path=%s spots=%d\n",
+			day.Format("2006-01-02"), call, stats.Path, stats.Records)
 	}
 	return allSpots, aggregate, nil
 }

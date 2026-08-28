@@ -258,6 +258,33 @@ go run ./cmd/contest-spot-match-load \
   /tmp/rbn-data/20251130.zip
 ```
 
+For repeated match experiments, build a focused parsed RBN cache once and point
+the matcher at cache days instead of raw zip files:
+
+```bash
+go run ./cmd/rbn-cache-build \
+  -cache-dir /tmp/rbn-cache-ti8x \
+  -dx-call TI8X \
+  -dense-spot-ids \
+  /tmp/rbn-data/20251129.zip \
+  /tmp/rbn-data/20251130.zip
+
+go run ./cmd/contest-spot-match-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 1000 \
+  -cty-dat data/cty/cty.dat \
+  -rbn-cache /tmp/rbn-cache-ti8x \
+  -window 5m \
+  https://cqww.com/publiclogs/2025cw/ti8x.log \
+  2025-11-29 \
+  2025-11-30
+```
+
+The first cache slice is intentionally callsign-focused. Cache files live under
+`<cache-dir>/YYYY/MM/DD/by_dx_call/<CALL>.jsonl`, with a day manifest alongside
+them. Use the same focused callsign and dense-ID choice as the `spots_flat`
+backfill when match rows need relationship-compatible `spot_ref` values.
+
 Use `-frequency-tolerance-khz` when the match policy should reject spots that
 are too far away from the logged QSO frequency. Use `-max-matches-per-qso` for a
 nearest-N materialization when a full many-to-many window would be too dense.
