@@ -38,6 +38,11 @@ IDs, account IDs, UUID-like values, and source-file identifiers are the natural
 fit. These fields benefit from equality, prefix search, lexical range, and
 direct projection without treating every identifier as a small category.
 
+For RBN analysis, spotter calibration is tracked separately from raw spots. See
+`SPOTTER_PROFILES_DESIGN.md` for the proposed `rbn_spotter_nodes`,
+`spotter_profile_snapshots`, and `spotter_profiles` tables, plus weighted SNR
+and reach-scoring notes.
+
 Use `StringSearch` for unstructured text. Raw comments or long descriptions can
 be searchable if the application needs that behavior. Raw Cabrillo lines should
 stay in source files or object storage and be represented in QS by parsed fields

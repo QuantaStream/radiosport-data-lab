@@ -37,6 +37,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
   five-minute activity buckets.
 - `docs/SWPC_AND_CONTEST_PLAN.md` defines the historical space-weather and
   Tier 1 Cabrillo contest-log expansion.
+- `docs/SPOTTER_PROFILES_DESIGN.md` sketches spotter calibration, weighted SNR,
+  and reach-scoring tables/views.
 - `docs/QUERY_VIEWS.md` documents reusable views and smoke queries.
 - `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
   distributed flat-loader benchmark and captures a tarball of evidence.
