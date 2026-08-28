@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	defaultSolarSource       = "https://services.swpc.noaa.gov/text/daily-solar-indices.txt"
-	defaultGeomagSource      = "https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt"
-	defaultHistoricalBaseURL = "https://ftp.swpc.noaa.gov/pub/indices/old_indices"
+	defaultSolarSource        = "https://services.swpc.noaa.gov/text/daily-solar-indices.txt"
+	defaultGeomagSource       = "https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt"
+	defaultHistoricalBaseURLs = "https://ftp.swpc.noaa.gov/pub/indices/old_indices,https://solar.physics.montana.edu/takeda/NOAA_reports/archive/{year}"
 )
 
 func main() {
@@ -31,7 +31,7 @@ func main() {
 	geomagSource := flag.String("geomag-source", defaultGeomagSource, "SWPC daily geomagnetic indices URL, file path, or file:// URL")
 	year := flag.Int("year", 0, "historical SWPC year to load using YYYY_DSD.txt and YYYY_DGD.txt; explicit source flags override this")
 	cacheDir := flag.String("cache-dir", "data/swpc", "cache directory for -year historical SWPC files")
-	historicalBaseURL := flag.String("historical-base-url", defaultHistoricalBaseURL, "base URL for -year historical SWPC files")
+	historicalBaseURL := flag.String("historical-base-url", defaultHistoricalBaseURLs, "comma-separated base URLs or URL templates for -year historical SWPC files; {year} is expanded")
 	refreshCache := flag.Bool("refresh-cache", false, "redownload -year source files even when cached files exist")
 	fromValue := flag.String("from", "", "inclusive UTC start date, YYYY-MM-DD; empty means first parsed date")
 	toValue := flag.String("to", "", "inclusive UTC end date, YYYY-MM-DD; empty means last parsed date")
@@ -198,11 +198,19 @@ func resolveYearlySource(ctx context.Context, product string, year int, cacheDir
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return "", err
 	}
-	sourceURL := strings.TrimRight(strings.TrimSpace(baseURL), "/") + "/" + filename
-	if err := downloadSource(ctx, sourceURL, path, timeout); err != nil {
-		return "", err
+	urls := historicalSourceURLs(baseURL, filename, year)
+	if len(urls) == 0 {
+		return "", fmt.Errorf("historical base URL is required")
 	}
-	return path, nil
+	var attempts []string
+	for _, sourceURL := range urls {
+		if err := downloadSource(ctx, sourceURL, path, timeout); err != nil {
+			attempts = append(attempts, fmt.Sprintf("%s: %v", sourceURL, err))
+			continue
+		}
+		return path, nil
+	}
+	return "", fmt.Errorf("download %s: all historical sources failed: %s", filename, strings.Join(attempts, "; "))
 }
 
 func yearlyFilename(product string, year int) (string, error) {
@@ -222,6 +230,21 @@ func yearlyFilename(product string, year int) (string, error) {
 func fileHasContent(path string) bool {
 	stat, err := os.Stat(path)
 	return err == nil && !stat.IsDir() && stat.Size() > 0
+}
+
+func historicalSourceURLs(baseURLs, filename string, year int) []string {
+	yearText := fmt.Sprintf("%04d", year)
+	parts := strings.Split(baseURLs, ",")
+	urls := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		part = strings.ReplaceAll(part, "{year}", yearText)
+		urls = append(urls, strings.TrimRight(part, "/")+"/"+filename)
+	}
+	return urls
 }
 
 func downloadSource(ctx context.Context, sourceURL, dest string, timeout time.Duration) error {

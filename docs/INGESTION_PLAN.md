@@ -289,7 +289,9 @@ go run ./cmd/swpc-load \
 
 For historical contest windows, use `-year` to load the annual SWPC daily solar
 and daily geomagnetic files. The command reuses cached files from `data/swpc`
-when present and downloads `YYYY_DSD.txt` plus `YYYY_DGD.txt` when missing:
+when present and downloads `YYYY_DSD.txt` plus `YYYY_DGD.txt` when missing. The
+default historical source list tries the SWPC archive path first and then a
+NOAA report mirror; use `-historical-base-url` to override or narrow that list.
 
 ```bash
 go run ./cmd/swpc-load \
@@ -300,7 +302,7 @@ go run ./cmd/swpc-load \
   -target http://127.0.0.1:8088/ingest/json
 ```
 
-If the older SWPC archive endpoint is unavailable, stage the annual files in
+If remote historical fetches are unavailable, stage the annual files in
 `data/swpc` with the expected names, or pass them explicitly:
 
 ```bash

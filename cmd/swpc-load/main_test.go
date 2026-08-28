@@ -73,3 +73,43 @@ func TestResolveYearlySourceDownloadsMissingFile(t *testing.T) {
 		t.Fatalf("downloaded data = %q, want downloaded", string(data))
 	}
 }
+
+func TestResolveYearlySourceFallsBackToSecondBaseURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/archive/2025/2025_DSD.txt" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte("fallback"))
+	}))
+	defer server.Close()
+
+	cacheDir := t.TempDir()
+	baseURLs := "http://127.0.0.1:1," + server.URL + "/archive/{year}"
+	got, err := resolveYearlySource(context.Background(), "solar", 2025, cacheDir, baseURLs, false, 100*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "fallback" {
+		t.Fatalf("downloaded data = %q, want fallback", string(data))
+	}
+}
+
+func TestHistoricalSourceURLsExpandYearTemplates(t *testing.T) {
+	got := historicalSourceURLs("https://example.test/root, https://example.test/archive/{year}/", "2025_DSD.txt", 2025)
+	want := []string{
+		"https://example.test/root/2025_DSD.txt",
+		"https://example.test/archive/2025/2025_DSD.txt",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("url count = %d, want %d: %#v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("url %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}

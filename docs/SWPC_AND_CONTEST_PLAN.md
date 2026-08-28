@@ -61,7 +61,8 @@ truncation for core application workflows.
 and daily geomagnetic text products, merges them by UTC day, and emits loader
 events for both tables. Recent SWPC products are available from the default
 service URLs; older contest windows can be loaded from annual `YYYY_DSD.txt`
-and `YYYY_DGD.txt` files cached under `data/swpc`:
+and `YYYY_DGD.txt` files cached under `data/swpc`. The default historical
+source list tries the SWPC archive path first and then a NOAA report mirror:
 
 ```bash
 go run ./cmd/swpc-load \
@@ -72,7 +73,7 @@ go run ./cmd/swpc-load \
   -target http://127.0.0.1:8088/ingest/json
 ```
 
-If the historical SWPC endpoint is unavailable, place `2025_DSD.txt` and
+If remote historical fetches are unavailable, place `2025_DSD.txt` and
 `2025_DGD.txt` in `data/swpc`, or pass file paths with `-solar-source` and
 `-geomag-source`.
 
