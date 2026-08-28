@@ -57,6 +57,25 @@ targets. Spot and QSO payloads should carry:
 That keeps time-window joins simple and avoids relying on runtime date
 truncation for core application workflows.
 
+`cmd/swpc-load` implements the first backfill path. It reads SWPC daily solar
+and daily geomagnetic text products, merges them by UTC day, and emits loader
+events for both tables. Recent SWPC products are available from the default
+service URLs; older contest windows can be loaded from staged local files:
+
+```bash
+go run ./cmd/swpc-load \
+  -solar-source /path/to/2025_DSD.txt \
+  -geomag-source /path/to/2025_DGD.txt \
+  -from 2025-11-29 \
+  -to 2025-11-30 \
+  -target http://127.0.0.1:8088/ingest/json
+```
+
+When posting through `qstream-loader`, include both SWPC tables in the loader
+allowlist. The loader commits its native session on graceful shutdown, so
+long-running backfills should either keep the loader up for more batches or stop
+it cleanly before doing a cold readback verification.
+
 Example analytical shape:
 
 ```sql
@@ -77,8 +96,9 @@ order by spots desc
 limit 50;
 ```
 
-The tables and spot payload keys are modeled. The SWPC ingester is still
-implementation work.
+The tables, spot payload keys, and first SWPC ingester are implemented. The
+next SWPC slice is historical file discovery/staging for contest windows such
+as CQWW CW 2025.
 
 ## Cabrillo Tier 1 Scope
 

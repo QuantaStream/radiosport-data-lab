@@ -263,6 +263,43 @@ configuration only; never commit them.
 Historical A, K/Kp, and SFI/F10.7 values should be loaded as independent,
 joinable time-series facts before contest analysis.
 
+`cmd/swpc-load` reads NOAA SWPC daily solar and geomagnetic text products,
+merges rows by UTC day, and emits one `swpc_daily_index` event plus up to eight
+`swpc_k_index_3h` events per day. Without `-target`, it writes JSONL to stdout
+for inspection. With `-target`, it posts batches to a running `qstream-loader`.
+
+Recent SWPC smoke:
+
+```bash
+go run ./cmd/swpc-load \
+  -from 2026-08-21 \
+  -to 2026-08-21 \
+  > /tmp/swpc-20260821.jsonl
+```
+
+Loader smoke:
+
+```bash
+go run ./cmd/swpc-load \
+  -from 2026-08-21 \
+  -to 2026-08-21 \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 20
+```
+
+For historical contest windows, stage SWPC daily solar and daily geomagnetic
+text files locally if the older archive endpoints are not reachable, then pass
+them explicitly:
+
+```bash
+go run ./cmd/swpc-load \
+  -solar-source /path/to/2025_DSD.txt \
+  -geomag-source /path/to/2025_DGD.txt \
+  -from 2025-11-29 \
+  -to 2025-11-30 \
+  -target http://127.0.0.1:8088/ingest/json
+```
+
 Initial loader payloads:
 
 ```json

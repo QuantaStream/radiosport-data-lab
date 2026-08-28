@@ -16,6 +16,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/rbn-telnet-sql-ingest` batches live telnet spots into prepared SQL inserts.
 - `cmd/rbn-update-cty` refreshes local CTY/DXCC data for telnet enrichment.
 - `cmd/rbn-qrz-lookup` fetches optional QRZ profiles and can cache them in SQL.
+- `cmd/swpc-load` parses NOAA SWPC solar/geomagnetic indices and emits loader
+  events for daily and three-hour propagation tables.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
@@ -48,6 +50,7 @@ go run ./cmd/rbn-archive-to-jsonl /tmp/rbn-data/20260821.zip > /tmp/rbn-spots.js
 go run ./cmd/rbn-archive-load -target http://127.0.0.1:8088/ingest/json /tmp/rbn-data/20260821.zip
 go run ./cmd/rbn-telnet-sql-ingest -dry-run -limit 10
 go run ./cmd/rbn-update-cty
+go run ./cmd/swpc-load -from 2026-08-21 -to 2026-08-21 > /tmp/swpc-20260821.jsonl
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-telnet-sql-ingest -qrz-enrich
 ```
@@ -80,6 +83,17 @@ the QRZ relationship vector. Use `rbn-archive-load -spot-type rbn_spot_flat
 -qrz-parents=false -dense-spot-ids` to isolate raw archive ingestion throughput
 with storage-friendly day-local column IDs. Pass multiple daily archive files
 and `-day-workers N` to parallelize a historical backfill across days.
+
+SWPC backfills use the same loader endpoint. Start `qstream-loader` with both
+`swpc_daily_indices` and `swpc_k_indices_3h` in its `-tables` allowlist, then
+post a date range:
+
+```bash
+go run ./cmd/swpc-load \
+  -from 2026-08-21 \
+  -to 2026-08-21 \
+  -target http://127.0.0.1:8088/ingest/json
+```
 
 ## Near-Term Build Plan
 
