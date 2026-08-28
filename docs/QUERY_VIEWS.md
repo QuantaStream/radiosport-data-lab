@@ -213,6 +213,13 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_spot_match_base.sql
 ```
 
+Create or refresh the best-match convenience view after the base view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_best_spot_match_base.sql
+```
+
 Useful smoke query:
 
 ```sql
@@ -263,9 +270,8 @@ select
   time_delta_seconds,
   abs_frequency_delta_khz,
   match_score
-from contest_spot_match_base
+from contest_best_spot_match_base
 where station_call = 'TI8X'
-  and is_best_match = 1
 order by qso_at
 limit 30;
 ```

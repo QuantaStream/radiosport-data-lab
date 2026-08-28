@@ -158,6 +158,8 @@ loaded:
 ```bash
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_spot_match_base.sql
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_best_spot_match_base.sql
 ```
 
 Load a single Cabrillo contest log through the JSON loader:
@@ -261,9 +263,8 @@ Best-match smoke:
 
 ```sql
 select band, count(*) as best_matches, avg(match_score) as avg_match_score
-from contest_spot_match_base
+from contest_best_spot_match_base
 where station_call = 'TI8X'
-  and is_best_match = 1
 group by band
 order by best_matches desc
 limit 20;

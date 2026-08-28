@@ -243,6 +243,7 @@ if [ "$install_views" = "1" ]; then
   run_mysql_file "$app_repo/sql/views/contest_qso_propagation_base.sql"
   run_mysql_file "$app_repo/sql/views/contest_rbn_activity_5m_base.sql"
   run_mysql_file "$app_repo/sql/views/contest_spot_match_base.sql"
+  run_mysql_file "$app_repo/sql/views/contest_best_spot_match_base.sql"
 fi
 
 log "verification counts"
@@ -269,9 +270,8 @@ limit 20;
 log "verification best-match summary"
 mysql_exec -e "
 select band, count(*) as best_matches, avg(match_score) as avg_match_score
-from contest_spot_match_base
+from contest_best_spot_match_base
 where station_call = '$station'
-  and is_best_match = 1
 group by band
 order by best_matches desc
 limit 20;
