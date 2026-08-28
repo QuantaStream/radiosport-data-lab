@@ -4,6 +4,8 @@ select
   s.spotted_at as spotted_at,
   s.spot_day_key as spot_day_key,
   s.spot_3h_bucket_key as spot_3h_bucket_key,
+  s.spot_day_ref as spot_day_ref,
+  s.spot_3h_bucket_ref as spot_3h_bucket_ref,
   s.spotter_call as spotter_call,
   s.spotter_prefix as spotter_prefix,
   s.spotter_continent as spotter_continent,
