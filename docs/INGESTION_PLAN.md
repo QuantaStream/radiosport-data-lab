@@ -287,9 +287,21 @@ go run ./cmd/swpc-load \
   -batch-size 20
 ```
 
-For historical contest windows, stage SWPC daily solar and daily geomagnetic
-text files locally if the older archive endpoints are not reachable, then pass
-them explicitly:
+For historical contest windows, use `-year` to load the annual SWPC daily solar
+and daily geomagnetic files. The command reuses cached files from `data/swpc`
+when present and downloads `YYYY_DSD.txt` plus `YYYY_DGD.txt` when missing:
+
+```bash
+go run ./cmd/swpc-load \
+  -year 2025 \
+  -cache-dir data/swpc \
+  -from 2025-11-29 \
+  -to 2025-11-30 \
+  -target http://127.0.0.1:8088/ingest/json
+```
+
+If the older SWPC archive endpoint is unavailable, stage the annual files in
+`data/swpc` with the expected names, or pass them explicitly:
 
 ```bash
 go run ./cmd/swpc-load \

@@ -86,12 +86,15 @@ and `-day-workers N` to parallelize a historical backfill across days.
 
 SWPC backfills use the same loader endpoint. Start `qstream-loader` with both
 `swpc_daily_indices` and `swpc_k_indices_3h` in its `-tables` allowlist, then
-post a date range:
+post a date range. Historical annual files are cached under `data/swpc` when
+`-year` is used:
 
 ```bash
 go run ./cmd/swpc-load \
-  -from 2026-08-21 \
-  -to 2026-08-21 \
+  -year 2025 \
+  -cache-dir data/swpc \
+  -from 2025-11-29 \
+  -to 2025-11-30 \
   -target http://127.0.0.1:8088/ingest/json
 ```
 

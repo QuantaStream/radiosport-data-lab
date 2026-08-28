@@ -60,16 +60,21 @@ truncation for core application workflows.
 `cmd/swpc-load` implements the first backfill path. It reads SWPC daily solar
 and daily geomagnetic text products, merges them by UTC day, and emits loader
 events for both tables. Recent SWPC products are available from the default
-service URLs; older contest windows can be loaded from staged local files:
+service URLs; older contest windows can be loaded from annual `YYYY_DSD.txt`
+and `YYYY_DGD.txt` files cached under `data/swpc`:
 
 ```bash
 go run ./cmd/swpc-load \
-  -solar-source /path/to/2025_DSD.txt \
-  -geomag-source /path/to/2025_DGD.txt \
+  -year 2025 \
+  -cache-dir data/swpc \
   -from 2025-11-29 \
   -to 2025-11-30 \
   -target http://127.0.0.1:8088/ingest/json
 ```
+
+If the historical SWPC endpoint is unavailable, place `2025_DSD.txt` and
+`2025_DGD.txt` in `data/swpc`, or pass file paths with `-solar-source` and
+`-geomag-source`.
 
 When posting through `qstream-loader`, include both SWPC tables in the loader
 allowlist. The loader commits its native session on graceful shutdown, so
