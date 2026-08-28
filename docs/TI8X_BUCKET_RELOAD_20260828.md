@@ -14,6 +14,21 @@ activity buckets for CQ WW CW 2025 TI8X analysis.
 
 ## Loads
 
+Repeat the full workflow against an already running local standard server and
+`qstream-loader`:
+
+```bash
+./scripts/run-ti8x-contest-workflow.sh --reset
+```
+
+The script creates the required tables, truncates the workflow tables
+child-first when `--reset` is passed, loads SWPC rows, loads focused TI8X
+`spots_flat` rows, builds the parsed RBN cache, loads the Cabrillo log,
+materializes exact matches from the cache, installs views, and stores logs plus
+verification output under `/tmp/radiosport-ti8x-workflow-*`.
+
+Use the explicit command sequence below when testing individual stages.
+
 SWPC propagation context:
 
 ```bash

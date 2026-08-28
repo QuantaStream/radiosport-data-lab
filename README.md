@@ -25,6 +25,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/contest-spot-match-load` materializes QSO-to-RBN spot matches from a
   Cabrillo log and matching RBN archive files.
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
+- `scripts/run-ti8x-contest-workflow.sh` runs the focused TI8X contest
+  load/cache/match/view workflow against a running QS server and loader.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
@@ -206,6 +208,18 @@ limit 20;
 ```
 
 Materialize exact QSO-to-spot matches for the focused TI8X reload:
+
+```bash
+./scripts/run-ti8x-contest-workflow.sh --reset
+```
+
+The script expects QuantaStream and `qstream-loader` to already be running with
+the RadioSport schema directory. It creates the required tables, truncates the
+workflow tables when `--reset` is passed, loads SWPC context, loads focused
+`spots_flat` rows, builds the parsed RBN cache, materializes exact matches,
+installs the views, and writes logs plus verification output under `/tmp`.
+
+Manual form:
 
 ```bash
 go run ./cmd/rbn-cache-build \
