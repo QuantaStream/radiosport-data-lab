@@ -162,6 +162,10 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_best_spot_match_base.sql
 ```
 
+The match views expose Tableau-friendly UTC date parts such as `qso_hour`,
+`qso_day_of_week`, and `spotted_hour`, so common hour-by-band worksheets can
+use plain columns instead of generated date-part SQL.
+
 Load a single Cabrillo contest log through the JSON loader:
 
 ```bash
@@ -262,11 +266,11 @@ limit 20;
 Best-match smoke:
 
 ```sql
-select band, count(*) as best_matches, avg(match_score) as avg_match_score
+select qso_hour, band, count(*) as best_matches, avg(match_score) as avg_match_score
 from contest_best_spot_match_base
 where station_call = 'TI8X'
-group by band
-order by best_matches desc
+group by qso_hour, band
+order by qso_hour, band
 limit 20;
 ```
 

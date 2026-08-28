@@ -206,6 +206,12 @@ path.
 bucket correlation is not enough because it includes time delta, frequency
 delta, score/rank, signal, spotter, and SWPC context.
 
+The match views also expose Tableau-friendly UTC date parts:
+`qso_year`, `qso_month`, `qso_day`, `qso_day_of_week`, `qso_hour`,
+`spotted_year`, `spotted_month`, `spotted_day`, `spotted_day_of_week`, and
+`spotted_hour`. These keep common worksheets from needing generated date-part
+SQL for simple hour, day, and month heatmaps.
+
 Create or refresh the view:
 
 ```bash
@@ -264,6 +270,7 @@ Best match per QSO:
 select
   qso_id,
   qso_at,
+  qso_hour,
   band,
   spotter_call,
   spotted_at,
