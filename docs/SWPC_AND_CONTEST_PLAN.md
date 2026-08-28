@@ -93,9 +93,9 @@ select
   count(*) as spots
 from spots_flat s
 inner join swpc_daily_indices d
-  on s.spot_day_key = d.day_key
+  on s.spot_day_ref = d.day_key
 inner join swpc_k_indices_3h k
-  on s.spot_3h_bucket_key = k.bucket_key
+  on s.spot_3h_bucket_ref = k.bucket_key
 where s.spotted_at between todate('2025-11-29') and todate('2025-12-01')
 group by s.band, s.dx_prefix, d.sfi, k.kp_index
 order by spots desc

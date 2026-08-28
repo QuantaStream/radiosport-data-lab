@@ -53,8 +53,8 @@ plus hashes.
 | --- | --- | --- | --- |
 | `spot_id` | generated | `IntBSI` | Stable 63-bit hash, also `columnID`. |
 | `spotted_at` | `date` or telnet UTC minute | `TimestampBSI` | Time quantum field. |
-| `spot_day_key` | derived `YYYYMMDD` | `IntBSI` | UTC day key for SWPC joins and day-level filters. |
-| `spot_3h_bucket_key` | derived `YYYYMMDDHH` | `IntBSI` | UTC three-hour bucket key for K/Kp joins. |
+| `spot_day_key` | derived `YYYYMMDD` | `IntBSI` | UTC day key for SWPC bucketing and day-level filters. |
+| `spot_3h_bucket_key` | derived `YYYYMMDDHH` | `IntBSI` | UTC three-hour bucket key for K/Kp bucketing and display. |
 | `spotter_call` | `callsign` | `StringLexBSI length=8 maxLen=16` | Eight-byte lexical prefix keeps common callsigns in a compact BSI width; uncommon longer callsigns use backing-string rehydration for full projection. |
 | `dx_call` | `dx` | `StringLexBSI length=8 maxLen=16` | Prefix searches such as `LIKE 'N7%'` remain native BSI range predicates while avoiding the wider 16-byte BSI payload. |
 | `dx_call_ref` | `dx` | `ParentRelation -> qrz_callsigns` | Relationship vector for QS-native joins to QRZ enrichment rows. |
@@ -71,8 +71,11 @@ decimal place so Workbench and ad hoc radio queries display the familiar value.
 
 `spots_flat` mirrors the spot fact columns but intentionally omits
 `dx_call_ref`. It exists as a loader-throughput comparison table for archive
-backfills where we want to measure raw spot ingestion without QRZ parent stubs,
-relationship-vector writes, or reverse relationship artifacts in the path.
+backfills where we want to measure raw spot ingestion without QRZ parent stubs
+or QRZ reverse relationship artifacts in the path. It also maps
+`spot_day_key` into `spot_day_ref` and `spot_3h_bucket_key` into
+`spot_3h_bucket_ref`, giving contest archives QS-native relationship joins to
+the tiny SWPC parent tables.
 
 The table uses selector `type="rbn_spot_flat"`. Archive tools can target it with
 `-spot-type rbn_spot_flat -qrz-parents=false -dense-spot-ids`. The dense-id
@@ -163,11 +166,12 @@ SFI/F10.7-style values.
 | `source` | ingester | `StringEnum` | Source product label. |
 | `loaded_at` | ingester | `TimestampBSI` | Load timestamp. |
 
-Spot payloads carry `spot_day_key` and `spot_3h_bucket_key` so RBN spots can
-join directly to these SWPC tables. They are plain `IntBSI` fields in the first
-cut so historical archives can be loaded before SWPC parent rows exist; a later
-relationship-vector variant can be added once the SWPC loader guarantees parent
-rows first.
+Spot payloads carry `spot_day_key` and `spot_3h_bucket_key` for scalar filters.
+The `spots_flat` archive table maps those same payload values into
+`spot_day_ref` and `spot_3h_bucket_ref` relationship vectors for QS-native
+joins. Load SWPC parent rows before spot archives when running
+propagation-aware backfills. The live `spots` table keeps scalar SWPC keys until
+a live SWPC poller/stubber guarantees parent rows before telnet inserts.
 
 ### `contest_logs`
 

@@ -27,6 +27,22 @@ attributes:
   mappingStrategy: IntBSI
   type: Integer
   sourceOrdinal: 4
+- fieldName: spot_day_ref
+  sourceName: /data/spot_day_key
+  mappingStrategy: ParentRelation
+  foreignKey: swpc_daily_indices
+  relationshipArtifacts:
+    parentToChild: true
+  type: Integer
+  sourceOrdinal: 5
+- fieldName: spot_3h_bucket_ref
+  sourceName: /data/spot_3h_bucket_key
+  mappingStrategy: ParentRelation
+  foreignKey: swpc_k_indices_3h
+  relationshipArtifacts:
+    parentToChild: true
+  type: Integer
+  sourceOrdinal: 6
 - fieldName: spotter_call
   sourceName: /data/spotter_call
   mappingStrategy: StringLexBSI
@@ -34,17 +50,17 @@ attributes:
     length: "8"
   type: String
   maxLen: 16
-  sourceOrdinal: 5
+  sourceOrdinal: 7
 - fieldName: spotter_prefix
   sourceName: /data/spotter_prefix
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 6
+  sourceOrdinal: 8
 - fieldName: spotter_continent
   sourceName: /data/spotter_continent
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 7
+  sourceOrdinal: 9
 - fieldName: dx_call
   sourceName: /data/dx_call
   mappingStrategy: StringLexBSI
@@ -52,50 +68,50 @@ attributes:
     length: "8"
   type: String
   maxLen: 16
-  sourceOrdinal: 8
+  sourceOrdinal: 10
 - fieldName: dx_prefix
   sourceName: /data/dx_prefix
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 9
+  sourceOrdinal: 11
 - fieldName: dx_continent
   sourceName: /data/dx_continent
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 10
+  sourceOrdinal: 12
 - fieldName: frequency_khz
   sourceName: /data/frequency_khz
   mappingStrategy: FloatScaleBSI
   type: Float
   scale: 1
-  sourceOrdinal: 11
+  sourceOrdinal: 13
 - fieldName: band
   sourceName: /data/band
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 12
+  sourceOrdinal: 14
 - fieldName: mode
   sourceName: /data/mode
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 13
+  sourceOrdinal: 15
 - fieldName: signal_db
   sourceName: /data/signal_db
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 14
+  sourceOrdinal: 16
 - fieldName: speed_wpm
   sourceName: /data/speed_wpm
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 15
+  sourceOrdinal: 17
 - fieldName: transmit_mode
   sourceName: /data/transmit_mode
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 16
+  sourceOrdinal: 18
 - fieldName: source
   sourceName: /data/source
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 17
+  sourceOrdinal: 19

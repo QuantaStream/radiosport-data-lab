@@ -347,10 +347,13 @@ Initial loader payloads:
 }
 ```
 
-Spot payloads include `spot_day_key` and `spot_3h_bucket_key`. Contest QSO
-payloads already reserve `qso_day_key` and `qso_3h_bucket_key` in the schema
-plan. These precomputed keys make joins deterministic and avoid runtime date
-bucketing as a prerequisite for normal analysis.
+Spot payloads include `spot_day_key` and `spot_3h_bucket_key`. The `spots_flat`
+archive schema keeps those values as scalar keys and also maps them into
+`spot_day_ref` and `spot_3h_bucket_ref` relationship-vector fields for joins to
+SWPC daily and three-hour rows. Contest QSO payloads already reserve
+`qso_day_key` and `qso_3h_bucket_key` in the schema plan. These precomputed
+keys make joins deterministic and avoid runtime date bucketing as a prerequisite
+for normal analysis.
 
 ## Cabrillo Contest Log Backfill
 
