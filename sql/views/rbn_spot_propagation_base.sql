@@ -6,7 +6,12 @@ select
   s.spot_3h_bucket_key as spot_3h_bucket_key,
   s.spot_5m_bucket_key as spot_5m_bucket_key,
   s.activity_5m_id as activity_5m_id,
+  s.activity_5m_ref as activity_5m_ref,
   s.activity_5m_key as activity_5m_key,
+  a.activity_call as activity_call,
+  a.activity_band as activity_band,
+  a.activity_mode as activity_mode,
+  a.bucket_start as activity_5m_start,
   s.spot_day_ref as spot_day_ref,
   s.spot_3h_bucket_ref as spot_3h_bucket_ref,
   s.spotter_call as spotter_call,
@@ -33,6 +38,8 @@ select
   k.kp_index as kp_index,
   k.source as swpc_k_source
 from spots_flat as s
+inner join activity_5m_buckets as a
+  on s.activity_5m_ref = a.activity_5m_id
 inner join swpc_daily_indices as d
   on s.spot_day_ref = d.day_key
 inner join swpc_k_indices_3h as k

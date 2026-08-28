@@ -1,0 +1,50 @@
+tableName: activity_5m_buckets
+primaryKey: activity_5m_id
+selector: type="activity_5m_bucket"
+timeQuantumType: YMD
+timeQuantumField: bucket_start
+attributes:
+- fieldName: activity_5m_id
+  sourceName: /data/activity_5m_id
+  mappingStrategy: IntBSI
+  type: Integer
+  columnID: true
+  sourceOrdinal: 1
+- fieldName: activity_5m_key
+  sourceName: /data/activity_5m_key
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "32"
+  type: String
+  maxLen: 64
+  sourceOrdinal: 2
+- fieldName: activity_call
+  sourceName: /data/activity_call
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "8"
+  type: String
+  maxLen: 16
+  sourceOrdinal: 3
+- fieldName: activity_band
+  sourceName: /data/activity_band
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 4
+- fieldName: activity_mode
+  sourceName: /data/activity_mode
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 5
+- fieldName: bucket_key
+  sourceName: /data/bucket_key
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 6
+- fieldName: bucket_start
+  sourceName: /data/bucket_start
+  mappingStrategy: TimestampBSI
+  configuration:
+    granularity: "second"
+  type: DateTime
+  sourceOrdinal: 7

@@ -126,6 +126,14 @@ attributes:
   mappingStrategy: IntBSI
   type: Integer
   sourceOrdinal: 20
+- fieldName: activity_5m_ref
+  sourceName: /data/activity_5m_id
+  mappingStrategy: ParentRelation
+  foreignKey: activity_5m_buckets
+  relationshipArtifacts:
+    parentToChild: true
+  type: Integer
+  sourceOrdinal: 21
 - fieldName: activity_5m_key
   sourceName: /data/activity_5m_key
   mappingStrategy: StringLexBSI
@@ -133,4 +141,4 @@ attributes:
     length: "32"
   type: String
   maxLen: 64
-  sourceOrdinal: 21
+  sourceOrdinal: 22

@@ -15,6 +15,11 @@ objects:
   creation_date: 2026-08-23T00:00:00Z
   modification_date: 2026-08-23T00:00:00Z
 - schema_name: quanta
+  table_name: activity_5m_buckets
+  object_type: TABLE
+  creation_date: 2026-08-28T00:00:00Z
+  modification_date: 2026-08-28T00:00:00Z
+- schema_name: quanta
   table_name: swpc_daily_indices
   object_type: TABLE
   creation_date: 2026-08-28T00:00:00Z

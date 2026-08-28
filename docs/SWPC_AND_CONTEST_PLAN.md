@@ -56,6 +56,7 @@ targets. Spot and QSO payloads should carry:
 - `qso_3h_bucket_key`
 - `qso_5m_bucket_key`
 - `activity_5m_id`
+- `activity_5m_ref`
 - `activity_5m_key`
 
 That keeps time-window joins simple and avoids relying on runtime date
@@ -66,6 +67,11 @@ The shared five-minute activity key shape is
 spots and the submitted station for Cabrillo QSOs. The hash-backed
 `activity_5m_id` is the compact comparison key; the string form is retained for
 Workbench/Tableau readability and ad hoc debugging.
+
+`activity_5m_buckets` is now the shared parent table for those bucket keys.
+`spots_flat.activity_5m_ref` and `contest_qsos.activity_5m_ref` both reference
+it, which turns spot-to-QSO bucket matching into a native relationship-vector
+join.
 
 `cmd/swpc-load` implements the first backfill path. It reads SWPC daily solar
 and daily geomagnetic text products, merges them by UTC day, and emits loader
@@ -89,9 +95,11 @@ If remote historical fetches are unavailable, place `2025_DSD.txt` and
 `-geomag-source`.
 
 When posting through `qstream-loader`, include both SWPC tables in the loader
-allowlist. The loader commits its native session on graceful shutdown, so
-long-running backfills should either keep the loader up for more batches or stop
-it cleanly before doing a cold readback verification.
+allowlist. Full contest reloads should also include `activity_5m_buckets`,
+`spots_flat`, `contest_logs`, and `contest_qsos`. The loader commits its native
+session on graceful shutdown, so long-running backfills should either keep the
+loader up for more batches or stop it cleanly before doing a cold readback
+verification.
 
 Create the reusable spot/SWPC query view:
 
@@ -116,9 +124,9 @@ order by spots desc
 limit 50;
 ```
 
-The tables, spot payload keys, and first SWPC ingester are implemented. The
-next SWPC slice is historical file discovery/staging for contest windows such
-as CQWW CW 2025.
+The tables, spot payload keys, and SWPC ingester are implemented. Historical
+SWPC reloads for contest windows such as CQ WW CW 2025 are now covered by
+`-year`, `-cache-dir`, `-from`, and `-to`.
 
 ## Cabrillo Tier 1 Scope
 
@@ -179,6 +187,7 @@ Initial parser shape:
 - derive station and worked-call prefix/continent with the CTY parser
 - derive `qso_day_key` and `qso_3h_bucket_key`
 - derive `qso_5m_bucket_key`, `activity_5m_id`, and `activity_5m_key`
+- emit `activity_5m_bucket` parent rows before `contest_qso` child rows
 - keep source-file metadata and a raw-line hash
 - store raw Cabrillo source files outside QS so they can be reprocessed
 
@@ -208,11 +217,10 @@ time/frequency predicates where not:
 - RBN spots to Cabrillo QSOs by station/callsign, band, five-minute activity
   bucket, and eventually frequency proximity
 
-Current QS limitation: `spots_flat.activity_5m_id =
-contest_qsos.activity_5m_id` is a non-relationship peer-table join, so it is not
-yet executable in the direct bitmap runtime. Product options are to materialize
-an `activity_5m_buckets` parent table that both facts reference, or to build a
-derived match table during contest analysis backfills.
+Spot-to-QSO five-minute matching should use `activity_5m_buckets` or the
+`contest_rbn_activity_5m_base` view. Directly joining `spots_flat` to
+`contest_qsos` on scalar `activity_5m_id` remains a non-relationship peer-table
+join and is intentionally not the preferred QS modeling path.
 
 ## Product Improvements Seen During Reload
 
@@ -222,9 +230,12 @@ derived match table during contest analysis backfills.
 - Selective archive backfills are valuable. `-dx-call` keeps focused contest
   reloads fast enough for iterative analysis even when the source files contain
   millions of unrelated RBN spots.
-- Bucketed correlation wants a first-class modeling pattern. Shared activity
-  buckets would turn useful peer-table comparisons into native
-  relationship-vector joins.
+- Bucketed correlation now has a first-class modeling pattern. Shared activity
+  buckets turn useful peer-table comparisons into native relationship-vector
+  joins.
+- Exact spot-to-QSO matching will eventually want a materialized match table
+  that records time delta, frequency delta, and confidence. The shared bucket is
+  the fast coarse match layer.
 
 ## Source References
 

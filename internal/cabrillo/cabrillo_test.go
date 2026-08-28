@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
 )
 
 const sampleLog = `START-OF-LOG: 3.0
@@ -78,13 +80,16 @@ func TestNewEventsKeepsParentBeforeQSOs(t *testing.T) {
 		t.Fatalf("Parse() error = %v", err)
 	}
 	events := NewEvents(log, qsos)
-	if len(events) != 3 {
+	if len(events) != 5 {
 		t.Fatalf("len(events) = %d", len(events))
 	}
 	if event, ok := events[0].(LogEvent); !ok || event.Type != LogEventType || event.Data.LogID != log.LogID {
 		t.Fatalf("event[0] = %#v, want parent log event", events[0])
 	}
-	if event, ok := events[1].(QSOEvent); !ok || event.Type != QSOEventType || event.Data.LogID != log.LogID {
-		t.Fatalf("event[1] = %#v, want child qso event", events[1])
+	if event, ok := events[1].(rbn.Activity5MBucketEvent); !ok || event.Type != rbn.Activity5MBucketEventType {
+		t.Fatalf("event[1] = %#v, want activity parent event", events[1])
+	}
+	if event, ok := events[3].(QSOEvent); !ok || event.Type != QSOEventType || event.Data.LogID != log.LogID {
+		t.Fatalf("event[3] = %#v, want child qso event", events[3])
 	}
 }

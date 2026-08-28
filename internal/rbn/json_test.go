@@ -52,6 +52,40 @@ func TestFiveMinuteBucketKeyFloorsToBucketStart(t *testing.T) {
 	}
 }
 
+func TestFiveMinuteBucketStartFloorsToBucketStart(t *testing.T) {
+	ts := time.Date(2026, 8, 21, 14, 37, 22, 0, time.UTC)
+	want := time.Date(2026, 8, 21, 14, 35, 0, 0, time.UTC)
+	if got := FiveMinuteBucketStartUTC(ts); !got.Equal(want) {
+		t.Fatalf("FiveMinuteBucketStartUTC() = %s, want %s", got, want)
+	}
+}
+
+func TestNewActivity5MBucketEvent(t *testing.T) {
+	bucket := Activity5MBucketFromSpot(testSpot())
+	event := NewActivity5MBucketEvent(bucket)
+	if got, want := event.Type, Activity5MBucketEventType; got != want {
+		t.Fatalf("type = %q, want %q", got, want)
+	}
+	if got, want := event.Data.Activity5MKey, "KC2SIZ|20M|CW|202608210000"; got != want {
+		t.Fatalf("activity_5m_key = %q, want %q", got, want)
+	}
+	if got, want := event.Data.ActivityCall, "KC2SIZ"; got != want {
+		t.Fatalf("activity_call = %q, want %q", got, want)
+	}
+	if got, want := event.Data.ActivityBand, "20M"; got != want {
+		t.Fatalf("activity_band = %q, want %q", got, want)
+	}
+	if got, want := event.Data.ActivityMode, "CW"; got != want {
+		t.Fatalf("activity_mode = %q, want %q", got, want)
+	}
+	if got, want := event.Data.BucketKey, 202608210000; got != want {
+		t.Fatalf("bucket_key = %d, want %d", got, want)
+	}
+	if got, want := event.Data.BucketStart, "2026-08-21T00:00:00Z"; got != want {
+		t.Fatalf("bucket_start = %q, want %q", got, want)
+	}
+}
+
 func testSpot() Spot {
 	return Spot{
 		SpotID:           1,

@@ -25,8 +25,10 @@ func main() {
 	limit := flag.Int("limit", 0, "maximum records to load per archive file; 0 means no limit")
 	spotType := flag.String("spot-type", rbn.DefaultSpotEventType, "event type used for spot records")
 	qrzParents := flag.Bool("qrz-parents", true, "emit pending qrz_callsign parent events before spots")
+	activityParents := flag.Bool("activity-parents", true, "emit activity_5m_bucket parent events before spots")
 	denseSpotIDs := flag.Bool("dense-spot-ids", false, "assign day-local dense spot ids for storage-friendly archive backfills")
 	dxCallFilter := flag.String("dx-call", "", "optional DX callsign filter, for example TI8X")
+	parentFlushWait := flag.Duration("parent-flush-wait", 2*time.Second, "wait after posting generated parent rows before posting child rows")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-request timeout")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: rbn-archive-load [flags] <RBN daily .zip or .csv> [...]\n")
@@ -61,15 +63,17 @@ func main() {
 
 	sort.Strings(paths)
 	config := loadConfig{
-		target:       *target,
-		batchSize:    *batchSize,
-		postWorkers:  *workers,
-		limit:        *limit,
-		spotType:     *spotType,
-		qrzParents:   *qrzParents,
-		denseSpotIDs: *denseSpotIDs,
-		dxCallFilter: normalizedDXCall,
-		timeout:      *timeout,
+		target:          *target,
+		batchSize:       *batchSize,
+		postWorkers:     *workers,
+		limit:           *limit,
+		spotType:        *spotType,
+		qrzParents:      *qrzParents,
+		activityParents: *activityParents,
+		denseSpotIDs:    *denseSpotIDs,
+		dxCallFilter:    normalizedDXCall,
+		parentFlushWait: *parentFlushWait,
+		timeout:         *timeout,
 	}
 
 	startedAt := time.Now()
@@ -84,16 +88,20 @@ func main() {
 		rejectedRows += result.rejectedRows
 		skippedFooter += result.skippedFooter
 		if len(paths) > 1 {
-			fmt.Fprintf(os.Stderr, "file=%s rows=%d emitted=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
-				result.path, result.rows, result.emitted, result.accepted, result.failed, result.rejectedRows,
+			fmt.Fprintf(os.Stderr, "file=%s rows=%d emitted=%d parents=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
+				result.path, result.rows, result.emitted, result.parentEvents, result.accepted, result.failed, result.rejectedRows,
 				result.skippedFooter, result.elapsed.Round(time.Millisecond))
 		}
 		if result.err != nil && firstErr == nil {
 			firstErr = result.err
 		}
 	}
-	fmt.Fprintf(os.Stderr, "files=%d rows=%d emitted=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
-		len(paths), rows, emitted, accepted, failed, rejectedRows, skippedFooter, time.Since(startedAt).Round(time.Millisecond))
+	var parentEvents int
+	for _, result := range results {
+		parentEvents += result.parentEvents
+	}
+	fmt.Fprintf(os.Stderr, "files=%d rows=%d emitted=%d parents=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
+		len(paths), rows, emitted, parentEvents, accepted, failed, rejectedRows, skippedFooter, time.Since(startedAt).Round(time.Millisecond))
 	if firstErr != nil {
 		log.Fatal(firstErr)
 	}
@@ -162,6 +170,35 @@ func loadArchives(ctx context.Context, config loadConfig, paths []string, dayWor
 func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoadResult {
 	startedAt := time.Now()
 	result := archiveLoadResult{path: path}
+
+	if config.activityParents {
+		parentEvents, err := collectActivityParentEvents(ctx, config, path)
+		if err != nil {
+			result.err = err
+			result.elapsed = time.Since(startedAt)
+			return result
+		}
+		result.parentEvents = len(parentEvents)
+		if len(parentEvents) > 0 {
+			accepted, failed, err := postEventBatches(ctx, config, parentEvents)
+			result.accepted += accepted
+			result.failed += failed
+			if err != nil {
+				result.err = err
+				result.elapsed = time.Since(startedAt)
+				return result
+			}
+			if failed > 0 {
+				result.err = fmt.Errorf("%s had %d activity parent loader failures", path, failed)
+				result.elapsed = time.Since(startedAt)
+				return result
+			}
+			if config.parentFlushWait > 0 {
+				time.Sleep(config.parentFlushWait)
+			}
+		}
+	}
+
 	reader, archiveDate, err := rbn.OpenArchiveFile(path)
 	if err != nil {
 		result.err = err
@@ -232,8 +269,8 @@ func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoa
 		result.err = err
 	}
 	result.rows = stats.Rows
-	result.accepted = accepted
-	result.failed = failed
+	result.accepted += accepted
+	result.failed += failed
 	result.rejectedRows = stats.RejectedRows
 	result.skippedFooter = stats.SkippedFooter
 	result.elapsed = time.Since(startedAt)
@@ -241,6 +278,59 @@ func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoa
 		result.err = fmt.Errorf("%s had %d loader failures", path, failed)
 	}
 	return result
+}
+
+func collectActivityParentEvents(ctx context.Context, config loadConfig, path string) ([]interface{}, error) {
+	reader, archiveDate, err := rbn.OpenArchiveFile(path)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	buckets := map[uint64]rbn.Activity5MBucket{}
+	var emitted int
+	_, err = rbn.ReadArchiveCSVWithDate(reader, archiveDate, func(spot rbn.Spot) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if config.limit > 0 && emitted >= config.limit {
+			return errLimitReached
+		}
+		if config.dxCallFilter != "" && spot.DXCall != config.dxCallFilter {
+			return nil
+		}
+		bucket := rbn.Activity5MBucketFromSpot(spot)
+		buckets[bucket.Activity5MID] = bucket
+		emitted++
+		return nil
+	})
+	if err != nil && err != errLimitReached {
+		return nil, err
+	}
+
+	ordered := rbn.SortedActivity5MBuckets(buckets)
+	events := make([]interface{}, 0, len(ordered))
+	for _, bucket := range ordered {
+		events = append(events, rbn.NewActivity5MBucketEvent(bucket))
+	}
+	return events, nil
+}
+
+func postEventBatches(ctx context.Context, config loadConfig, events []interface{}) (int, int, error) {
+	poster := newBatchPoster(ctx, rbn.LoaderClient{Target: config.target}, config.timeout, config.postWorkers)
+	for start := 0; start < len(events); start += config.batchSize {
+		end := start + config.batchSize
+		if end > len(events) {
+			end = len(events)
+		}
+		if err := poster.Post(events[start:end]); err != nil {
+			accepted, failed, _ := poster.Close()
+			return accepted, failed, err
+		}
+	}
+	return poster.Close()
 }
 
 type batchPoster struct {
@@ -266,21 +356,24 @@ type postResult struct {
 }
 
 type loadConfig struct {
-	target       string
-	batchSize    int
-	postWorkers  int
-	limit        int
-	spotType     string
-	qrzParents   bool
-	denseSpotIDs bool
-	dxCallFilter string
-	timeout      time.Duration
+	target          string
+	batchSize       int
+	postWorkers     int
+	limit           int
+	spotType        string
+	qrzParents      bool
+	activityParents bool
+	denseSpotIDs    bool
+	dxCallFilter    string
+	parentFlushWait time.Duration
+	timeout         time.Duration
 }
 
 type archiveLoadResult struct {
 	path          string
 	rows          int
 	emitted       int
+	parentEvents  int
 	accepted      int
 	failed        int
 	rejectedRows  int

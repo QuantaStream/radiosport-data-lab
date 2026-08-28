@@ -57,6 +57,7 @@ plus hashes.
 | `spot_3h_bucket_key` | derived `YYYYMMDDHH` | `IntBSI` | UTC three-hour bucket key for K/Kp bucketing and display. |
 | `spot_5m_bucket_key` | derived `YYYYMMDDHHMM` | `IntBSI` | UTC five-minute bucket key for contest spot/QSO correlation. |
 | `activity_5m_id` | derived hash | `IntBSI` | Compact hash of `DX_CALL|BAND|MODE|five-minute bucket`. |
+| `activity_5m_ref` | derived hash | `ParentRelation -> activity_5m_buckets` | Relationship vector for native spot/QSO bucket joins. |
 | `activity_5m_key` | derived string | `StringLexBSI length=32 maxLen=64` | Debuggable bucket key for Workbench/Tableau queries. |
 | `spotter_call` | `callsign` | `StringLexBSI length=8 maxLen=16` | Eight-byte lexical prefix keeps common callsigns in a compact BSI width; uncommon longer callsigns use backing-string rehydration for full projection. |
 | `dx_call` | `dx` | `StringLexBSI length=8 maxLen=16` | Prefix searches such as `LIKE 'N7%'` remain native BSI range predicates while avoiding the wider 16-byte BSI payload. |
@@ -80,15 +81,33 @@ or QRZ reverse relationship artifacts in the path. It also maps
 `spot_3h_bucket_ref`, giving contest archives QS-native relationship joins to
 the tiny SWPC parent tables.
 
-`spots_flat` also carries `spot_5m_bucket_key`, `activity_5m_id`, and
-`activity_5m_key` for comparing spotted activity against submitted contest QSO
-activity.
+`spots_flat` also carries `spot_5m_bucket_key`, `activity_5m_id`,
+`activity_5m_ref`, and `activity_5m_key` for comparing spotted activity against
+submitted contest QSO activity through the shared bucket parent.
 
 The table uses selector `type="rbn_spot_flat"`. Archive tools can target it with
 `-spot-type rbn_spot_flat -qrz-parents=false -dense-spot-ids`. The dense-id
 option is important for loader backfills because `spot_id` is the QS column ID:
 day-local contiguous IDs build compact bitmap artifacts, while stable hash IDs
 are intentionally sparse and are better treated as event identity.
+
+### `activity_5m_buckets`
+
+`activity_5m_buckets` is a shared parent dimension for bucket-level contest
+analysis. Both RBN spots and Cabrillo QSOs derive the same activity key when
+they refer to the same station, band, mode, and UTC five-minute bucket. Modeling
+that key as a parent table lets QS use relationship-vector joins instead of a
+peer-table equality join between two fact tables.
+
+| Column | Source | Mapper | Notes |
+| --- | --- | --- | --- |
+| `activity_5m_id` | derived hash | `IntBSI` | Primary key and column ID. |
+| `activity_5m_key` | derived string | `StringLexBSI length=32 maxLen=64` | Human-readable `CALL|BAND|MODE|YYYYMMDDHHMM` key. |
+| `activity_call` | derived call | `StringLexBSI length=8 maxLen=16` | Normalized station/callsign for the shared activity bucket. |
+| `activity_band` | derived band | `StringEnum` | Normalized band. |
+| `activity_mode` | derived mode | `StringEnum` | Normalized mode. |
+| `bucket_key` | derived `YYYYMMDDHHMM` | `IntBSI` | UTC five-minute bucket key. |
+| `bucket_start` | derived timestamp | `TimestampBSI` | UTC bucket start timestamp. |
 
 ### `qrz_callsigns`
 
@@ -213,6 +232,7 @@ submitted log and SWPC time buckets.
 | `qso_3h_bucket_key` | generated `YYYYMMDDHH` | `ParentRelation` | Joins to `swpc_k_indices_3h`. |
 | `qso_5m_bucket_key` | generated `YYYYMMDDHHMM` | `IntBSI` | UTC five-minute bucket for matching RBN activity. |
 | `activity_5m_id` | derived hash | `IntBSI` | Compact hash of `STATION_CALL|BAND|MODE|five-minute bucket`. |
+| `activity_5m_ref` | derived hash | `ParentRelation -> activity_5m_buckets` | Relationship vector for native joins to RBN spot buckets. |
 | `activity_5m_key` | derived string | `StringLexBSI length=32 maxLen=64` | Debuggable bucket key shared with RBN spot activity. |
 | `station_call`, `worked_call` | QSO line | `StringLexBSI length=8 maxLen=16` | Identifier fields. |
 | `station_prefix`, `station_continent`, `worked_prefix`, `worked_continent` | CTY parser | `StringEnum` | Contest geography. |

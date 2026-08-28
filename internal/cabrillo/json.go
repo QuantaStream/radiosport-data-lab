@@ -1,6 +1,10 @@
 package cabrillo
 
-import "time"
+import (
+	"time"
+
+	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
+)
 
 const (
 	LogEventType = "contest_log"
@@ -120,10 +124,33 @@ func NewQSOEvent(qso QSO) QSOEvent {
 }
 
 func NewEvents(log Log, qsos []QSO) []interface{} {
-	events := make([]interface{}, 0, len(qsos)+1)
+	return NewEventsWithActivityParents(log, qsos, true)
+}
+
+func NewEventsWithActivityParents(log Log, qsos []QSO, activityParents bool) []interface{} {
+	var bucketEvents []interface{}
+	if activityParents {
+		bucketEvents = NewActivity5MBucketEvents(qsos)
+	}
+	events := make([]interface{}, 0, len(qsos)+len(bucketEvents)+1)
 	events = append(events, NewLogEvent(log))
+	events = append(events, bucketEvents...)
 	for _, qso := range qsos {
 		events = append(events, NewQSOEvent(qso))
+	}
+	return events
+}
+
+func NewActivity5MBucketEvents(qsos []QSO) []interface{} {
+	buckets := map[uint64]rbn.Activity5MBucket{}
+	for _, qso := range qsos {
+		bucket := rbn.NewActivity5MBucket(qso.StationCall, qso.Band, qso.Mode, qso.QSOAt)
+		buckets[bucket.Activity5MID] = bucket
+	}
+	ordered := rbn.SortedActivity5MBuckets(buckets)
+	events := make([]interface{}, 0, len(ordered))
+	for _, bucket := range ordered {
+		events = append(events, rbn.NewActivity5MBucketEvent(bucket))
 	}
 	return events
 }

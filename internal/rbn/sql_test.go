@@ -55,3 +55,23 @@ func TestSpotSQLArgs(t *testing.T) {
 		t.Fatalf("activity_5m_key arg = %v, want %v", got, want)
 	}
 }
+
+func TestActivity5MBucketSQLArgs(t *testing.T) {
+	bucket := Activity5MBucketFromSpot(testSpot())
+	args := Activity5MBucketSQLArgs(bucket)
+	if got, want := len(args), 7; got != want {
+		t.Fatalf("arg count = %d, want %d", got, want)
+	}
+	if got, want := args[1], "KC2SIZ|20M|CW|202608210000"; got != want {
+		t.Fatalf("activity_5m_key arg = %v, want %v", got, want)
+	}
+	if got, want := args[2], "KC2SIZ"; got != want {
+		t.Fatalf("activity_call arg = %v, want %v", got, want)
+	}
+	if got, want := args[3], "20M"; got != want {
+		t.Fatalf("activity_band arg = %v, want %v", got, want)
+	}
+	if got, want := args[6], "2026-08-21 00:00:00"; got != want {
+		t.Fatalf("bucket_start arg = %v, want %v", got, want)
+	}
+}

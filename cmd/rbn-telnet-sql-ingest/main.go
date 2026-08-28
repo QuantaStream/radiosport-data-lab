@@ -139,6 +139,9 @@ func main() {
 			firstBufferedAt = time.Time{}
 			return nil
 		}
+		if err := ensureActivityBuckets(ctx, db, batch); err != nil {
+			return err
+		}
 		if err := ensureQRZParents(ctx, qrzStore, batch); err != nil {
 			return err
 		}
@@ -272,6 +275,38 @@ func ensureQRZParents(ctx context.Context, store qrz.SQLStore, batch []rbn.Spot)
 		}
 		seen[call] = struct{}{}
 		if _, err := store.EnsurePendingProfile(ctx, call); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureActivityBuckets(ctx context.Context, db *sql.DB, batch []rbn.Spot) error {
+	if db == nil {
+		return fmt.Errorf("nil sql db")
+	}
+	seen := map[uint64]struct{}{}
+	for _, spot := range batch {
+		bucket := rbn.Activity5MBucketFromSpot(spot)
+		if bucket.Activity5MID == 0 {
+			continue
+		}
+		if _, ok := seen[bucket.Activity5MID]; ok {
+			continue
+		}
+		seen[bucket.Activity5MID] = struct{}{}
+		var existing int64
+		err := db.QueryRowContext(ctx,
+			`select activity_5m_id from activity_5m_buckets where activity_5m_id = ? limit 1`,
+			bucket.Activity5MID,
+		).Scan(&existing)
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if _, err := db.ExecContext(ctx, rbn.Activity5MBucketInsertSQL(), rbn.Activity5MBucketSQLArgs(bucket)...); err != nil {
 			return err
 		}
 	}

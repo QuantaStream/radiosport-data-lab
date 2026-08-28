@@ -4,6 +4,10 @@ Both ingesters should produce the same normalized spot record. Archive and
 backfill files should use the batch/streaming loader path. Live telnet spots
 should use prepared SQL inserts with sensible batching.
 
+Archive and Cabrillo backfills also emit shared five-minute activity parent
+rows before child facts. This keeps spot-to-QSO correlation on QS's native
+relationship-vector path instead of requiring a peer-table join between facts.
+
 ## Normalized Spot Payload
 
 ```json
@@ -43,6 +47,11 @@ spot fact shape.
 `spots.dx_call_ref` is a relationship-vector field that reuses `/data/dx_call`
 and points at `qrz_callsigns.callsign`. Ingesters must create a pending QRZ
 parent row before inserting the first spot for a DX callsign.
+
+`spots.activity_5m_ref`, `spots_flat.activity_5m_ref`, and
+`contest_qsos.activity_5m_ref` reuse `/data/activity_5m_id` and point at
+`activity_5m_buckets.activity_5m_id`. Archive, Cabrillo, and live SQL ingesters
+ensure the activity parent exists before inserting child rows.
 
 Current archive files include a full timestamp column. The parser also supports
 older/minute-only shapes by deriving the date from `YYYYMMDD.csv` or
@@ -111,6 +120,10 @@ Before each SQL spot batch is committed, the ingester ensures a
 start with `lookup_status='pending'`. That keeps `spots.dx_call_ref` valid
 without waiting on QRZ.
 
+The SQL ingester also ensures one `activity_5m_buckets` row exists for every
+unique activity bucket in the batch. Those rows are small and deterministic, so
+they can be inserted synchronously without adding QRZ-style network latency.
+
 Refresh CTY data explicitly:
 
 ```bash
@@ -146,12 +159,18 @@ path for multi-year data.
 Relationship-table target:
 
 1. Parse archive records into the normalized payload.
-2. Emit one pending `qrz_callsign` event before the first spot for each DX call.
-3. Write newline-delimited JSON records with `cmd/rbn-archive-to-jsonl`.
-4. Or POST batches directly to the QuantaStream streaming loader with
+2. Emit one `activity_5m_bucket` parent event before the first child spot for
+   each bucket.
+3. Emit one pending `qrz_callsign` event before the first spot for each DX call.
+4. Write newline-delimited JSON records with `cmd/rbn-archive-to-jsonl`.
+5. Or POST batches directly to the QuantaStream streaming loader with
    `cmd/rbn-archive-load`.
 
 This path should be the sustained-throughput baseline.
+
+Start `qstream-loader` with every target table in its allowlist. A full contest
+reload normally includes `activity_5m_buckets`, `spots_flat`, `contest_logs`,
+`contest_qsos`, `swpc_daily_indices`, and `swpc_k_indices_3h`.
 
 Example direct loader run:
 
@@ -159,6 +178,7 @@ Example direct loader run:
 go run ./cmd/rbn-archive-load \
   -target http://127.0.0.1:8088/ingest/json \
   -batch-size 1000 \
+  -activity-parents=true \
   /tmp/rbn-data/20260821.zip
 ```
 
@@ -170,6 +190,7 @@ go run ./cmd/rbn-archive-load \
   -batch-size 1000 \
   -spot-type rbn_spot_flat \
   -qrz-parents=false \
+  -activity-parents=true \
   -dense-spot-ids \
   /tmp/rbn-data/20260821.zip
 ```
@@ -184,6 +205,7 @@ go run ./cmd/rbn-archive-load \
   -day-workers 4 \
   -spot-type rbn_spot_flat \
   -qrz-parents=false \
+  -activity-parents=true \
   -dense-spot-ids \
   -dx-call TI8X \
   /tmp/rbn-data/20260818.zip \
@@ -390,8 +412,9 @@ Initial Cabrillo flow:
 3. Classify submitted station and worked callsigns with CTY/DXCC data.
 4. Keep only Tier 1 submitted-station logs for the first pass.
 5. Emit one `contest_log` event per accepted log.
-6. Emit one `contest_qso` event per parsed QSO.
-7. Store raw Cabrillo source files outside QS for reprocessing and audit.
+6. Emit one `activity_5m_bucket` parent event per unique QSO activity bucket.
+7. Emit one `contest_qso` event per parsed QSO.
+8. Store raw Cabrillo source files outside QS for reprocessing and audit.
 
 Hard rejects should be limited to unrecoverable QSO structure. Unknown or
 unusual headers should become explicit `UNKNOWN` or `UNSPECIFIED` enum values so
@@ -402,6 +425,8 @@ The useful first joins are:
 - `contest_qsos.log_id -> contest_logs.log_id`
 - `contest_qsos.qso_day_key -> swpc_daily_indices.day_key`
 - `contest_qsos.qso_3h_bucket_key -> swpc_k_indices_3h.bucket_key`
-- RBN spots to SWPC by spot day/bucket keys after spot payloads are extended
-- RBN spots to Cabrillo QSOs by callsign, band, bounded time window, and
-  frequency proximity
+- `contest_qsos.activity_5m_ref -> activity_5m_buckets.activity_5m_id`
+- `spots_flat.activity_5m_ref -> activity_5m_buckets.activity_5m_id`
+- RBN spots to SWPC through `spot_day_ref` and `spot_3h_bucket_ref`
+- RBN spots to Cabrillo QSOs by shared activity bucket, and eventually by exact
+  bounded time/frequency proximity through a materialized match table

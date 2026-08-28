@@ -8,7 +8,12 @@ select
   q.qso_3h_bucket_key as qso_3h_bucket_key,
   q.qso_5m_bucket_key as qso_5m_bucket_key,
   q.activity_5m_id as activity_5m_id,
+  q.activity_5m_ref as activity_5m_ref,
   q.activity_5m_key as activity_5m_key,
+  a.activity_call as activity_call,
+  a.activity_band as activity_band,
+  a.activity_mode as activity_mode,
+  a.bucket_start as activity_5m_start,
   q.station_call as station_call,
   q.station_prefix as station_prefix,
   q.station_continent as station_continent,
@@ -48,6 +53,8 @@ select
 from contest_qsos as q
 inner join contest_logs as l
   on q.log_id = l.log_id
+inner join activity_5m_buckets as a
+  on q.activity_5m_ref = a.activity_5m_id
 inner join swpc_daily_indices as d
   on q.qso_day_key = d.day_key
 inner join swpc_k_indices_3h as k

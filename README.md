@@ -19,7 +19,7 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/swpc-load` parses NOAA SWPC solar/geomagnetic indices and emits loader
   events for daily and three-hour propagation tables.
 - `cmd/cabrillo-load` parses public Cabrillo contest logs and emits
-  `contest_logs` plus `contest_qsos` loader events.
+  `contest_logs`, `activity_5m_buckets`, and `contest_qsos` loader events.
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
@@ -91,6 +91,11 @@ rounded down to the nearest UTC five-minute boundary. That gives analysts a
 compact way to compare submitted contest QSOs with RBN spot density without
 using runtime interval arithmetic in every query.
 
+The shared `activity_5m_buckets` table is the parent dimension for this shape.
+`spots_flat.activity_5m_ref` and `contest_qsos.activity_5m_ref` both point at
+it, so QS can use native relationship-vector joins for bucket-level contest
+analysis.
+
 For loader pipeline tests, `spots_flat` provides the same spot fact shape without
 the QRZ relationship vector. Use `rbn-archive-load -spot-type rbn_spot_flat
 -qrz-parents=false -dense-spot-ids` to isolate raw archive ingestion throughput
@@ -99,10 +104,11 @@ and `-day-workers N` to parallelize a historical backfill across days. Add
 `-dx-call CALL` when you want a focused contest reload from very large archive
 files.
 
-SWPC backfills use the same loader endpoint. Start `qstream-loader` with both
-`swpc_daily_indices` and `swpc_k_indices_3h` in its `-tables` allowlist, then
-post a date range. Historical annual files are cached under `data/swpc` when
-`-year` is used:
+SWPC backfills use the same loader endpoint. Start `qstream-loader` with
+`activity_5m_buckets`, `spots_flat`, `contest_logs`, `contest_qsos`,
+`swpc_daily_indices`, and `swpc_k_indices_3h` in its `-tables` allowlist when
+running the full contest reload. Historical annual SWPC files are cached under
+`data/swpc` when `-year` is used:
 
 ```bash
 go run ./cmd/swpc-load \
@@ -128,6 +134,14 @@ Install the submitted-log propagation view after the `contest_logs`,
 ```bash
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_qso_propagation_base.sql
+```
+
+Install the joined spot/QSO five-minute activity view after both RBN spots and
+Cabrillo QSOs are loaded:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_rbn_activity_5m_base.sql
 ```
 
 Load a single Cabrillo contest log through the JSON loader:
@@ -163,6 +177,17 @@ select activity_5m_key, band, count(*) as rbn_spots
 from spots_flat
 group by activity_5m_key, band
 order by rbn_spots desc
+limit 20;
+```
+
+Spot/QSO bucket match smoke:
+
+```sql
+select activity_5m_key, activity_band, count(*) as qso_spot_pairs
+from contest_rbn_activity_5m_base
+where station_call = 'TI8X'
+group by activity_5m_key, activity_band
+order by qso_spot_pairs desc
 limit 20;
 ```
 

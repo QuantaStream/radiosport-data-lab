@@ -28,7 +28,8 @@ func main() {
 	contestID := flag.String("contest-id", "", "contest id override; empty derives from Cabrillo CONTEST and QSO year")
 	scopeRegion := flag.String("scope-region", "tier1", "scope label stored on contest_log rows")
 	sourceFile := flag.String("source-file", "", "source label override stored in QS rows")
-	parentFlushWait := flag.Duration("parent-flush-wait", 2*time.Second, "wait after posting contest_log parent rows before posting contest_qso child rows")
+	activityParents := flag.Bool("activity-parents", true, "emit activity_5m_bucket parent events before contest_qso child rows")
+	parentFlushWait := flag.Duration("parent-flush-wait", 2*time.Second, "wait after posting parent rows before posting contest_qso child rows")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: cabrillo-load [flags] <Cabrillo log path or URL> [...]\n")
 		flag.PrintDefaults()
@@ -73,7 +74,7 @@ func main() {
 		if closeErr != nil {
 			log.Fatalf("close %s: %v", source, closeErr)
 		}
-		events := cabrillo.NewEvents(contestLog, qsos)
+		events := cabrillo.NewEventsWithActivityParents(contestLog, qsos, *activityParents)
 
 		if strings.TrimSpace(*target) == "" {
 			if err := writeJSONL(os.Stdout, events); err != nil {
@@ -84,13 +85,17 @@ func main() {
 			continue
 		}
 
-		logAccepted, logFailed, err := postEvents(ctx, *target, []interface{}{cabrillo.NewLogEvent(contestLog)}, *batchSize, *timeout)
+		parentEvents := []interface{}{cabrillo.NewLogEvent(contestLog)}
+		if *activityParents {
+			parentEvents = append(parentEvents, cabrillo.NewActivity5MBucketEvents(qsos)...)
+		}
+		parentAccepted, parentFailed, err := postEvents(ctx, *target, parentEvents, *batchSize, *timeout)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if logFailed > 0 {
+		if parentFailed > 0 {
 			fmt.Fprintf(os.Stderr, "source=%s log_id=%s qsos=%d rejected=%d accepted=%d failed=%d\n",
-				source, contestLog.LogID, len(qsos), stats.RejectedQSOs, logAccepted, logFailed)
+				source, contestLog.LogID, len(qsos), stats.RejectedQSOs, parentAccepted, parentFailed)
 			os.Exit(1)
 		}
 		if *parentFlushWait > 0 {
@@ -104,8 +109,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		accepted := logAccepted + qsoAccepted
-		failed := logFailed + qsoFailed
+		accepted := parentAccepted + qsoAccepted
+		failed := parentFailed + qsoFailed
 		fmt.Fprintf(os.Stderr, "source=%s log_id=%s qsos=%d rejected=%d accepted=%d failed=%d\n",
 			source, contestLog.LogID, len(qsos), stats.RejectedQSOs, accepted, failed)
 		totalLogs++
