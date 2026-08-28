@@ -19,6 +19,9 @@ type Spot struct {
 	SpottedAt        time.Time
 	SpotDayKey       int
 	Spot3HBucketKey  int
+	Spot5MBucketKey  int
+	Activity5MID     uint64
+	Activity5MKey    string
 	SpotterCall      string
 	SpotterPrefix    string
 	SpotterContinent string
@@ -106,11 +109,53 @@ func ThreeHourBucketKeyUTC(t time.Time) int {
 	return DayKeyUTC(utc)*100 + bucketHour
 }
 
+func FiveMinuteBucketKeyUTC(t time.Time) int {
+	if t.IsZero() {
+		return 0
+	}
+	utc := t.UTC()
+	bucketMinute := (utc.Minute() / 5) * 5
+	return (((DayKeyUTC(utc)*100)+utc.Hour())*100 + bucketMinute)
+}
+
+func Activity5MKey(call string, band string, mode string, t time.Time) string {
+	return strings.Join([]string{
+		normalizeActivityPart(call),
+		normalizeActivityPart(band),
+		normalizeActivityPart(mode),
+		strconv.Itoa(FiveMinuteBucketKeyUTC(t)),
+	}, "|")
+}
+
+func Activity5MID(key string) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(strings.ToUpper(strings.TrimSpace(key))))
+	return h.Sum64() & ((uint64(1) << 63) - 1)
+}
+
 func populateSpotTimeKeys(spot *Spot) {
 	spot.SpotDayKey = DayKeyUTC(spot.SpottedAt)
 	spot.Spot3HBucketKey = ThreeHourBucketKeyUTC(spot.SpottedAt)
+	spot.Spot5MBucketKey = FiveMinuteBucketKeyUTC(spot.SpottedAt)
+	spot.Activity5MKey = Activity5MKey(spot.DXCall, spot.Band, spotActivityMode(*spot), spot.SpottedAt)
+	spot.Activity5MID = Activity5MID(spot.Activity5MKey)
 }
 
 func formatFrequencyKHz(freq float64) string {
 	return strconv.FormatFloat(freq, 'f', 1, 64)
+}
+
+func spotActivityMode(spot Spot) string {
+	if strings.TrimSpace(spot.TransmitMode) != "" {
+		return spot.TransmitMode
+	}
+	return spot.Mode
+}
+
+func normalizeActivityPart(value string) string {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	if value == "" {
+		return UnknownValue
+	}
+	return value
 }

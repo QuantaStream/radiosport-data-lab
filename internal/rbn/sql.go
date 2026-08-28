@@ -19,8 +19,11 @@ const SpotInsertSQL = `insert into spots (
   signal_db,
   speed_wpm,
   transmit_mode,
-  source
-) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  source,
+  spot_5m_bucket_key,
+  activity_5m_id,
+  activity_5m_key
+) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 func SpotSQLArgs(spot Spot) []interface{} {
 	return []interface{}{
@@ -41,6 +44,9 @@ func SpotSQLArgs(spot Spot) []interface{} {
 		spot.SpeedWPM,
 		spot.TransmitMode,
 		spot.Source,
+		spot.Spot5MBucketKey,
+		spot.Activity5MID,
+		spot.Activity5MKey,
 	}
 }
 

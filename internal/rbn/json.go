@@ -17,6 +17,9 @@ type SpotPayload struct {
 	SpottedAt        string  `json:"spotted_at"`
 	SpotDayKey       int     `json:"spot_day_key"`
 	Spot3HBucketKey  int     `json:"spot_3h_bucket_key"`
+	Spot5MBucketKey  int     `json:"spot_5m_bucket_key"`
+	Activity5MID     uint64  `json:"activity_5m_id"`
+	Activity5MKey    string  `json:"activity_5m_key"`
 	SpotterCall      string  `json:"spotter_call"`
 	SpotterPrefix    string  `json:"spotter_prefix"`
 	SpotterContinent string  `json:"spotter_continent"`
@@ -47,6 +50,9 @@ func NewSpotEventWithType(spot Spot, eventType string) SpotEvent {
 			SpottedAt:        spot.SpottedAt.UTC().Format(time.RFC3339),
 			SpotDayKey:       spot.SpotDayKey,
 			Spot3HBucketKey:  spot.Spot3HBucketKey,
+			Spot5MBucketKey:  spot.Spot5MBucketKey,
+			Activity5MID:     spot.Activity5MID,
+			Activity5MKey:    spot.Activity5MKey,
 			SpotterCall:      spot.SpotterCall,
 			SpotterPrefix:    spot.SpotterPrefix,
 			SpotterContinent: spot.SpotterContinent,

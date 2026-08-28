@@ -38,6 +38,7 @@ func main() {
 	sourceLabel := flag.String("source-label", "swpc", "source label stored in emitted rows")
 	target := flag.String("target", "", "optional qstream-loader JSON ingest endpoint; empty writes JSONL to stdout")
 	batchSize := flag.Int("batch-size", 100, "events per loader POST when -target is set")
+	parentFlushWait := flag.Duration("parent-flush-wait", 2*time.Second, "wait after posting daily parent rows before posting 3-hour child rows")
 	timeout := flag.Duration("timeout", 30*time.Second, "HTTP request timeout for source fetches and loader POSTs")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: swpc-load [flags]\n")
@@ -118,15 +119,46 @@ func main() {
 		return
 	}
 
-	accepted, failed, err := postEvents(ctx, *target, events, *batchSize, *timeout)
+	dailyEvents, kEvents := splitSWPCEvents(events)
+	dailyAccepted, dailyFailed, err := postEvents(ctx, *target, dailyEvents, *batchSize, *timeout)
 	if err != nil {
 		log.Fatal(err)
 	}
+	if dailyFailed > 0 {
+		fmt.Fprintf(os.Stderr, "solar_rows=%d geomag_rows=%d daily_events=%d k_events=%d accepted=%d failed=%d\n",
+			len(solarRows), len(geomagRows), dailyCount, kCount, dailyAccepted, dailyFailed)
+		os.Exit(1)
+	}
+	if len(kEvents) > 0 && *parentFlushWait > 0 {
+		time.Sleep(*parentFlushWait)
+	}
+	kAccepted, kFailed, err := postEvents(ctx, *target, kEvents, *batchSize, *timeout)
+	if err != nil {
+		log.Fatal(err)
+	}
+	accepted := dailyAccepted + kAccepted
+	failed := dailyFailed + kFailed
 	fmt.Fprintf(os.Stderr, "solar_rows=%d geomag_rows=%d daily_events=%d k_events=%d accepted=%d failed=%d\n",
 		len(solarRows), len(geomagRows), dailyCount, kCount, accepted, failed)
 	if failed > 0 {
 		os.Exit(1)
 	}
+}
+
+func splitSWPCEvents(events []interface{}) ([]interface{}, []interface{}) {
+	daily := make([]interface{}, 0)
+	k := make([]interface{}, 0)
+	for _, event := range events {
+		switch event.(type) {
+		case swpc.DailyIndexEvent:
+			daily = append(daily, event)
+		case swpc.KIndex3HEvent:
+			k = append(k, event)
+		default:
+			k = append(k, event)
+		}
+	}
+	return daily, k
 }
 
 func parseOptionalDay(value string) (time.Time, error) {

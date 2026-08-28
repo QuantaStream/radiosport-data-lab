@@ -61,6 +61,9 @@ type QSO struct {
 	QSOAt            time.Time
 	QSODayKey        int
 	QSO3HBucketKey   int
+	QSO5MBucketKey   int
+	Activity5MID     uint64
+	Activity5MKey    string
 	StationCall      string
 	StationPrefix    string
 	StationContinent string
@@ -178,6 +181,7 @@ func Parse(r io.Reader, options ParseOptions) (Log, []QSO, ParseStats, error) {
 			QSOAt:            raw.qsoAt,
 			QSODayKey:        rbn.DayKeyUTC(raw.qsoAt),
 			QSO3HBucketKey:   rbn.ThreeHourBucketKeyUTC(raw.qsoAt),
+			QSO5MBucketKey:   rbn.FiveMinuteBucketKeyUTC(raw.qsoAt),
 			StationCall:      raw.stationCall,
 			StationPrefix:    station.Prefix,
 			StationContinent: station.Continent,
@@ -191,6 +195,8 @@ func Parse(r io.Reader, options ParseOptions) (Log, []QSO, ParseStats, error) {
 			ReceivedExchange: raw.receivedExchange,
 			SourceFile:       sourceFile,
 		}
+		qso.Activity5MKey = rbn.Activity5MKey(qso.StationCall, qso.Band, qso.Mode, qso.QSOAt)
+		qso.Activity5MID = rbn.Activity5MID(qso.Activity5MKey)
 		qso.QSOID = stableQSOID(qso, raw.lineNumber)
 		qsos = append(qsos, qso)
 	}

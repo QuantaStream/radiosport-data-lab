@@ -25,8 +25,9 @@ func TestSpotSQLArgs(t *testing.T) {
 		TransmitMode:     "CW",
 		Source:           "telnet",
 	}
+	populateSpotTimeKeys(&spot)
 	args := SpotSQLArgs(spot)
-	if got, want := len(args), 17; got != want {
+	if got, want := len(args), 20; got != want {
 		t.Fatalf("arg count = %d, want %d", got, want)
 	}
 	if got, want := args[1], "2026-08-21 00:00:01"; got != want {
@@ -43,5 +44,14 @@ func TestSpotSQLArgs(t *testing.T) {
 	}
 	if got, want := args[10], 14054.4; got != want {
 		t.Fatalf("frequency_khz arg = %v, want %v", got, want)
+	}
+	if got, want := args[17], 202608210000; got != want {
+		t.Fatalf("spot_5m_bucket_key arg = %v, want %v", got, want)
+	}
+	if args[18] == uint64(0) {
+		t.Fatal("activity_5m_id arg = 0, want stable non-zero id")
+	}
+	if got, want := args[19], "KC2SIZ|20M|CW|202608210000"; got != want {
+		t.Fatalf("activity_5m_key arg = %v, want %v", got, want)
 	}
 }

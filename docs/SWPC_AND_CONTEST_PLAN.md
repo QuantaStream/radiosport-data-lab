@@ -51,11 +51,21 @@ targets. Spot and QSO payloads should carry:
 
 - `spot_day_key`
 - `spot_3h_bucket_key`
+- `spot_5m_bucket_key`
 - `qso_day_key`
 - `qso_3h_bucket_key`
+- `qso_5m_bucket_key`
+- `activity_5m_id`
+- `activity_5m_key`
 
 That keeps time-window joins simple and avoids relying on runtime date
 truncation for core application workflows.
+
+The shared five-minute activity key shape is
+`CALL|BAND|MODE|YYYYMMDDHHMM`, where the call is the spotted DX station for RBN
+spots and the submitted station for Cabrillo QSOs. The hash-backed
+`activity_5m_id` is the compact comparison key; the string form is retained for
+Workbench/Tableau readability and ad hoc debugging.
 
 `cmd/swpc-load` implements the first backfill path. It reads SWPC daily solar
 and daily geomagnetic text products, merges them by UTC day, and emits loader
@@ -70,7 +80,8 @@ go run ./cmd/swpc-load \
   -cache-dir data/swpc \
   -from 2025-11-29 \
   -to 2025-11-30 \
-  -target http://127.0.0.1:8088/ingest/json
+  -target http://127.0.0.1:8088/ingest/json \
+  -parent-flush-wait 2s
 ```
 
 If remote historical fetches are unavailable, place `2025_DSD.txt` and
@@ -167,6 +178,7 @@ Initial parser shape:
   sent/received exchange fields
 - derive station and worked-call prefix/continent with the CTY parser
 - derive `qso_day_key` and `qso_3h_bucket_key`
+- derive `qso_5m_bucket_key`, `activity_5m_id`, and `activity_5m_key`
 - keep source-file metadata and a raw-line hash
 - store raw Cabrillo source files outside QS so they can be reprocessed
 
@@ -193,8 +205,26 @@ time/frequency predicates where not:
 - `contest_qsos.qso_day_key -> swpc_daily_indices.day_key`
 - `contest_qsos.qso_3h_bucket_key -> swpc_k_indices_3h.bucket_key`
 - RBN spots to SWPC by precomputed day/3-hour keys once those fields are added
-- RBN spots to Cabrillo QSOs by station/callsign, band, time window, and
-  frequency proximity
+- RBN spots to Cabrillo QSOs by station/callsign, band, five-minute activity
+  bucket, and eventually frequency proximity
+
+Current QS limitation: `spots_flat.activity_5m_id =
+contest_qsos.activity_5m_id` is a non-relationship peer-table join, so it is not
+yet executable in the direct bitmap runtime. Product options are to materialize
+an `activity_5m_buckets` parent table that both facts reference, or to build a
+derived match table during contest analysis backfills.
+
+## Product Improvements Seen During Reload
+
+- Loader parent/child backfills need an explicit flush or drain barrier. The
+  current ingesters handle this with a brief parent phase wait, but a first-class
+  loader feature would make relationship-vector loads less hand-tuned.
+- Selective archive backfills are valuable. `-dx-call` keeps focused contest
+  reloads fast enough for iterative analysis even when the source files contain
+  millions of unrelated RBN spots.
+- Bucketed correlation wants a first-class modeling pattern. Shared activity
+  buckets would turn useful peer-table comparisons into native
+  relationship-vector joins.
 
 ## Source References
 

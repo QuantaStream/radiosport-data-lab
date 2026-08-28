@@ -27,6 +27,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `docs/LOADER_BENCHMARK_20260823.md` records the local flat-loader baseline.
 - `docs/CQWW_2025_STANDARD_BENCHMARK.md` records the two-day CQWW 2025
   standard-mode backfill and query pass.
+- `docs/TI8X_BUCKET_RELOAD_20260828.md` records the focused TI8X reload with
+  five-minute activity buckets.
 - `docs/SWPC_AND_CONTEST_PLAN.md` defines the historical space-weather and
   Tier 1 Cabrillo contest-log expansion.
 - `docs/QUERY_VIEWS.md` documents reusable views and smoke queries.
@@ -83,11 +85,19 @@ Archive and live ingesters create pending QRZ parent rows before spots so
 `spots.dx_call_ref` can exercise QS-native relationship joins; async QRZ
 enrichment updates those rows later.
 
+Archive and Cabrillo ingesters also compute five-minute activity buckets. The
+shared `activity_5m_key` shape is `CALL|BAND|MODE|YYYYMMDDHHMM`, with the time
+rounded down to the nearest UTC five-minute boundary. That gives analysts a
+compact way to compare submitted contest QSOs with RBN spot density without
+using runtime interval arithmetic in every query.
+
 For loader pipeline tests, `spots_flat` provides the same spot fact shape without
 the QRZ relationship vector. Use `rbn-archive-load -spot-type rbn_spot_flat
 -qrz-parents=false -dense-spot-ids` to isolate raw archive ingestion throughput
 with storage-friendly day-local column IDs. Pass multiple daily archive files
-and `-day-workers N` to parallelize a historical backfill across days.
+and `-day-workers N` to parallelize a historical backfill across days. Add
+`-dx-call CALL` when you want a focused contest reload from very large archive
+files.
 
 SWPC backfills use the same loader endpoint. Start `qstream-loader` with both
 `swpc_daily_indices` and `swpc_k_indices_3h` in its `-tables` allowlist, then
@@ -100,7 +110,8 @@ go run ./cmd/swpc-load \
   -cache-dir data/swpc \
   -from 2025-11-29 \
   -to 2025-11-30 \
-  -target http://127.0.0.1:8088/ingest/json
+  -target http://127.0.0.1:8088/ingest/json \
+  -parent-flush-wait 2s
 ```
 
 Install the general RBN propagation view after the `spots_flat` and SWPC tables
@@ -125,6 +136,7 @@ Load a single Cabrillo contest log through the JSON loader:
 go run ./cmd/cabrillo-load \
   -target http://127.0.0.1:8088/ingest/json \
   -batch-size 1000 \
+  -parent-flush-wait 2s \
   -cty-dat data/cty/cty.dat \
   https://cqww.com/publiclogs/2025cw/ti8x.log
 ```
@@ -142,6 +154,16 @@ where q.station_call = 'TI8X'
 group by q.band, q.worked_continent, d.sfi, k.kp_index
 order by qsos desc
 limit 30;
+```
+
+Five-minute bucket smoke:
+
+```sql
+select activity_5m_key, band, count(*) as rbn_spots
+from spots_flat
+group by activity_5m_key, band
+order by rbn_spots desc
+limit 20;
 ```
 
 ## Near-Term Build Plan

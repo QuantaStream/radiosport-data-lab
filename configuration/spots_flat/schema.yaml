@@ -115,3 +115,21 @@ attributes:
   mappingStrategy: StringEnum
   type: String
   sourceOrdinal: 19
+- fieldName: spot_5m_bucket_key
+  sourceName: /data/spot_5m_bucket_key
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 20
+- fieldName: activity_5m_id
+  sourceName: /data/activity_5m_id
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 21
+- fieldName: activity_5m_key
+  sourceName: /data/activity_5m_key
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "32"
+  type: String
+  maxLen: 64
+  sourceOrdinal: 22

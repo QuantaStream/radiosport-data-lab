@@ -46,6 +46,9 @@ type QSOPayload struct {
 	QSOAt            string  `json:"qso_at"`
 	QSODayKey        int     `json:"qso_day_key"`
 	QSO3HBucketKey   int     `json:"qso_3h_bucket_key"`
+	QSO5MBucketKey   int     `json:"qso_5m_bucket_key"`
+	Activity5MID     uint64  `json:"activity_5m_id"`
+	Activity5MKey    string  `json:"activity_5m_key"`
 	StationCall      string  `json:"station_call"`
 	StationPrefix    string  `json:"station_prefix"`
 	StationContinent string  `json:"station_continent"`
@@ -97,6 +100,9 @@ func NewQSOEvent(qso QSO) QSOEvent {
 			QSOAt:            formatTime(qso.QSOAt),
 			QSODayKey:        qso.QSODayKey,
 			QSO3HBucketKey:   qso.QSO3HBucketKey,
+			QSO5MBucketKey:   qso.QSO5MBucketKey,
+			Activity5MID:     qso.Activity5MID,
+			Activity5MKey:    qso.Activity5MKey,
 			StationCall:      qso.StationCall,
 			StationPrefix:    qso.StationPrefix,
 			StationContinent: qso.StationContinent,

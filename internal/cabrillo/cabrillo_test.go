@@ -52,6 +52,15 @@ func TestParseCabrilloCQWWLog(t *testing.T) {
 	if qsos[0].QSODayKey != 20251129 || qsos[0].QSO3HBucketKey != 2025112900 {
 		t.Fatalf("qso keys = %d/%d", qsos[0].QSODayKey, qsos[0].QSO3HBucketKey)
 	}
+	if got, want := qsos[0].QSO5MBucketKey, 202511290000; got != want {
+		t.Fatalf("qso_5m_bucket_key = %d, want %d", got, want)
+	}
+	if got, want := qsos[0].Activity5MKey, "TI8X|40M|CW|202511290000"; got != want {
+		t.Fatalf("activity_5m_key = %q, want %q", got, want)
+	}
+	if qsos[0].Activity5MID == 0 {
+		t.Fatal("activity_5m_id = 0, want stable non-zero id")
+	}
 	if qsos[0].Band != "40m" || qsos[0].WorkedCall != "K0DU" || qsos[0].ReceivedExchange != "04" {
 		t.Fatalf("qso[0] = %#v", qsos[0])
 	}

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ func main() {
 	spotType := flag.String("spot-type", rbn.DefaultSpotEventType, "event type used for spot records")
 	qrzParents := flag.Bool("qrz-parents", true, "emit pending qrz_callsign parent events before spots")
 	denseSpotIDs := flag.Bool("dense-spot-ids", false, "assign day-local dense spot ids for storage-friendly archive backfills")
+	dxCallFilter := flag.String("dx-call", "", "optional DX callsign filter, for example TI8X")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-request timeout")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: rbn-archive-load [flags] <RBN daily .zip or .csv> [...]\n")
@@ -48,6 +50,14 @@ func main() {
 	if (*workers > 1 || *dayWorkers > 1) && *qrzParents {
 		log.Fatal("-workers or -day-workers greater than 1 requires -qrz-parents=false; relationship loads must preserve parent-before-spot order")
 	}
+	normalizedDXCall := strings.TrimSpace(*dxCallFilter)
+	if normalizedDXCall != "" {
+		var ok bool
+		normalizedDXCall, ok = rbn.NormalizeCallsign(normalizedDXCall)
+		if !ok {
+			log.Fatalf("invalid -dx-call %q", *dxCallFilter)
+		}
+	}
 
 	sort.Strings(paths)
 	config := loadConfig{
@@ -58,6 +68,7 @@ func main() {
 		spotType:     *spotType,
 		qrzParents:   *qrzParents,
 		denseSpotIDs: *denseSpotIDs,
+		dxCallFilter: normalizedDXCall,
 		timeout:      *timeout,
 	}
 
@@ -182,6 +193,9 @@ func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoa
 		if config.limit > 0 && result.emitted >= config.limit {
 			return errLimitReached
 		}
+		if config.dxCallFilter != "" && spot.DXCall != config.dxCallFilter {
+			return nil
+		}
 		if config.qrzParents {
 			if _, ok := seenQRZ[spot.DXCall]; !ok {
 				seenQRZ[spot.DXCall] = struct{}{}
@@ -259,6 +273,7 @@ type loadConfig struct {
 	spotType     string
 	qrzParents   bool
 	denseSpotIDs bool
+	dxCallFilter string
 	timeout      time.Duration
 }
 

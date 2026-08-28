@@ -14,6 +14,9 @@ should use prepared SQL inserts with sensible batching.
     "spotted_at": "2026-08-21T00:00:00Z",
     "spot_day_key": 20260821,
     "spot_3h_bucket_key": 2026082100,
+    "spot_5m_bucket_key": 202608210000,
+    "activity_5m_id": 3085122920447939943,
+    "activity_5m_key": "KC2SIZ|20M|CW|202608210000",
     "spotter_call": "G4IRN",
     "spotter_prefix": "G",
     "spotter_continent": "EU",
@@ -71,8 +74,11 @@ insert into spots (
   signal_db,
   speed_wpm,
   transmit_mode,
-  source
-) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  source,
+  spot_5m_bucket_key,
+  activity_5m_id,
+  activity_5m_key
+) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ```
 
 Use prepared statements and client-side batches. The default live-stream policy
@@ -179,6 +185,7 @@ go run ./cmd/rbn-archive-load \
   -spot-type rbn_spot_flat \
   -qrz-parents=false \
   -dense-spot-ids \
+  -dx-call TI8X \
   /tmp/rbn-data/20260818.zip \
   /tmp/rbn-data/20260819.zip \
   /tmp/rbn-data/20260820.zip \
@@ -204,6 +211,11 @@ The `-limit` flag applies per archive file. For throughput tests, choose daily
 files with roughly similar row counts. One unusually large day will dominate the
 wall-clock time even when smaller days finish quickly. For stress and sustained
 load testing, include the large days deliberately and report the skew.
+
+Use `-dx-call CALL` for focused contest studies. The loader still parses the
+whole source archive, but only emits spots where the normalized DX call matches
+the supplied callsign. That makes two-day contest reloads cheap enough for
+iterative schema and query work.
 
 Local flat-loader matrix:
 

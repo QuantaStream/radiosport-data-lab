@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/QuantaStream/radiosport-data-lab/internal/qrz"
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
@@ -21,6 +22,7 @@ func main() {
 	spotType := flag.String("spot-type", rbn.DefaultSpotEventType, "event type used for spot records")
 	qrzParents := flag.Bool("qrz-parents", true, "emit pending qrz_callsign parent events before spots")
 	denseSpotIDs := flag.Bool("dense-spot-ids", false, "assign day-local dense spot ids for storage-friendly archive backfills")
+	dxCallFilter := flag.String("dx-call", "", "optional DX callsign filter, for example TI8X")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: rbn-archive-to-jsonl [flags] <RBN daily .zip or .csv>\n")
 		flag.PrintDefaults()
@@ -29,6 +31,14 @@ func main() {
 	if flag.NArg() != 1 {
 		flag.Usage()
 		os.Exit(2)
+	}
+	normalizedDXCall := strings.TrimSpace(*dxCallFilter)
+	if normalizedDXCall != "" {
+		var ok bool
+		normalizedDXCall, ok = rbn.NormalizeCallsign(normalizedDXCall)
+		if !ok {
+			log.Fatalf("invalid -dx-call %q", *dxCallFilter)
+		}
 	}
 
 	reader, archiveDate, err := rbn.OpenArchiveFile(flag.Arg(0))
@@ -43,6 +53,9 @@ func main() {
 	stats, err := rbn.ReadArchiveCSVWithDate(reader, archiveDate, func(spot rbn.Spot) error {
 		if *limit > 0 && emitted >= *limit {
 			return errLimitReached
+		}
+		if normalizedDXCall != "" && spot.DXCall != normalizedDXCall {
+			return nil
 		}
 		if *qrzParents {
 			if _, ok := seenQRZ[spot.DXCall]; !ok {

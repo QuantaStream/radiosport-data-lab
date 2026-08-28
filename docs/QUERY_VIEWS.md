@@ -19,6 +19,11 @@ The view intentionally avoids QRZ profile data. QRZ enrichment is sparse and is
 better queried through focused joins from `spots` until QS has broader left join
 coverage for optional relationships.
 
+The view exposes `spot_5m_bucket_key`, `activity_5m_id`, and `activity_5m_key`.
+Those fields are precomputed by the ingesters so callers can compare RBN spot
+activity with submitted contest QSOs without relying on runtime interval
+arithmetic.
+
 Useful smoke queries:
 
 ```sql
@@ -40,12 +45,28 @@ order by spots desc
 limit 50;
 ```
 
+```sql
+select
+  activity_5m_key,
+  band,
+  count(*) as rbn_spots
+from rbn_spot_propagation_base
+where spotted_at between todate('2025-11-29') and todate('2025-12-01')
+  and dx_call = 'TI8X'
+group by activity_5m_key, band
+order by rbn_spots desc
+limit 20;
+```
+
 ## `contest_qso_propagation_base`
 
 `contest_qso_propagation_base` is the matching base view for submitted Cabrillo
 contest logs. It starts with `contest_qsos`, joins the `contest_logs` parent
 row, and adds daily plus three-hour SWPC propagation context through the
 precomputed relationship-vector keys.
+
+The view exposes `qso_5m_bucket_key`, `activity_5m_id`, and `activity_5m_key`
+for bucketed comparison against RBN spot activity.
 
 Create or refresh the view:
 
@@ -99,6 +120,21 @@ limit 25;
 
 ```sql
 select
+  activity_5m_key,
+  band,
+  worked_continent,
+  sfi,
+  kp_index,
+  count(*) as qsos
+from contest_qso_propagation_base
+where station_call = 'TI8X'
+group by activity_5m_key, band, worked_continent, sfi, kp_index
+order by qsos desc
+limit 20;
+```
+
+```sql
+select
   band,
   dx_prefix,
   sfi,
@@ -124,3 +160,9 @@ group by spotter_continent, dx_continent, band
 order by spots desc
 limit 50;
 ```
+
+Current limitation: directly joining `contest_qsos` to `spots_flat` on
+`activity_5m_id` is a peer-table join, not a relationship-vector join, so QS
+rejects it today. The next product slice should either materialize a shared
+`activity_5m_buckets` parent table or build a dedicated QSO-to-spot match table
+for bucket-level contest analysis.
