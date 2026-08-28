@@ -136,6 +136,23 @@ The first two tables are:
 vectors to the SWPC tables. This makes propagation context directly joinable to
 submitted contest QSOs.
 
+`cmd/cabrillo-load` implements the first Cabrillo path. It can read a local file
+or public URL, emit JSONL for inspection, or post directly to `qstream-loader`.
+It sends the parent `contest_logs` row before `contest_qsos` and waits briefly
+for the loader to flush the parent so relationship-vector validation succeeds.
+
+```bash
+go run ./cmd/cabrillo-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 1000 \
+  -cty-dat data/cty/cty.dat \
+  https://cqww.com/publiclogs/2025cw/ti8x.log
+```
+
+The TI8X CQ WW CW 2025 public log is a useful first smoke: one `contest_logs`
+row, 3,947 `contest_qsos` rows, and zero parser rejects with the current public
+source file.
+
 ## Cabrillo Parsing Rules
 
 Own the parser in this repository. External libraries are useful references, but

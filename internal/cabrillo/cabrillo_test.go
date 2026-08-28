@@ -1,0 +1,81 @@
+package cabrillo
+
+import (
+	"strings"
+	"testing"
+	"time"
+)
+
+const sampleLog = `START-OF-LOG: 3.0
+CONTEST: CQ-WW-CW
+CALLSIGN: TI8X
+CATEGORY-OPERATOR: SINGLE-OP
+CATEGORY-ASSISTED: NON-ASSISTED
+CATEGORY-BAND: ALL
+CATEGORY-POWER: HIGH
+CATEGORY-MODE: CW
+CATEGORY-TRANSMITTER: ONE
+CLAIMED-SCORE: 4476480
+QSO:    7058 CW 2025-11-29 0002 TI8X             599 7     K0DU             599  04
+QSO:   21010 CW 2025-11-30 2346 TI8X             599 7     JA3YBK           599  25
+END-OF-LOG:
+`
+
+func TestParseCabrilloCQWWLog(t *testing.T) {
+	loadedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	log, qsos, stats, err := Parse(strings.NewReader(sampleLog), ParseOptions{
+		ScopeRegion: "tier1",
+		SourceFile:  "ti8x.log",
+		LoadedAt:    loadedAt,
+	})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if stats.QSOLines != 2 || stats.ParsedQSOs != 2 || stats.RejectedQSOs != 0 {
+		t.Fatalf("stats = %#v, want 2 parsed QSOs", stats)
+	}
+	if log.LogID != "cq-ww-cw-2025:TI8X" || log.ContestID != "cq-ww-cw-2025" {
+		t.Fatalf("log ids = %q/%q", log.LogID, log.ContestID)
+	}
+	if log.StationCall != "TI8X" || log.CategoryOperator != "SINGLE-OP" || log.ClaimedScore != 4476480 {
+		t.Fatalf("log = %#v", log)
+	}
+	if log.QSOCount != 2 || !log.LoadedAt.Equal(loadedAt) {
+		t.Fatalf("log count/loaded = %d/%s", log.QSOCount, log.LoadedAt)
+	}
+	if len(qsos) != 2 {
+		t.Fatalf("len(qsos) = %d", len(qsos))
+	}
+	if qsos[0].QSOAt.Format(time.RFC3339) != "2025-11-29T00:02:00Z" {
+		t.Fatalf("qso time = %s", qsos[0].QSOAt)
+	}
+	if qsos[0].QSODayKey != 20251129 || qsos[0].QSO3HBucketKey != 2025112900 {
+		t.Fatalf("qso keys = %d/%d", qsos[0].QSODayKey, qsos[0].QSO3HBucketKey)
+	}
+	if qsos[0].Band != "40m" || qsos[0].WorkedCall != "K0DU" || qsos[0].ReceivedExchange != "04" {
+		t.Fatalf("qso[0] = %#v", qsos[0])
+	}
+	if qsos[1].Band != "15m" || qsos[1].WorkedCall != "JA3YBK" || qsos[1].ReceivedExchange != "25" {
+		t.Fatalf("qso[1] = %#v", qsos[1])
+	}
+	if qsos[0].QSOID == 0 || qsos[0].QSOID == qsos[1].QSOID {
+		t.Fatalf("qso ids = %d/%d", qsos[0].QSOID, qsos[1].QSOID)
+	}
+}
+
+func TestNewEventsKeepsParentBeforeQSOs(t *testing.T) {
+	log, qsos, _, err := Parse(strings.NewReader(sampleLog), ParseOptions{SourceFile: "ti8x.log"})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	events := NewEvents(log, qsos)
+	if len(events) != 3 {
+		t.Fatalf("len(events) = %d", len(events))
+	}
+	if event, ok := events[0].(LogEvent); !ok || event.Type != LogEventType || event.Data.LogID != log.LogID {
+		t.Fatalf("event[0] = %#v, want parent log event", events[0])
+	}
+	if event, ok := events[1].(QSOEvent); !ok || event.Type != QSOEventType || event.Data.LogID != log.LogID {
+		t.Fatalf("event[1] = %#v, want child qso event", events[1])
+	}
+}

@@ -18,6 +18,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/rbn-qrz-lookup` fetches optional QRZ profiles and can cache them in SQL.
 - `cmd/swpc-load` parses NOAA SWPC solar/geomagnetic indices and emits loader
   events for daily and three-hour propagation tables.
+- `cmd/cabrillo-load` parses public Cabrillo contest logs and emits
+  `contest_logs` plus `contest_qsos` loader events.
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
@@ -53,6 +55,7 @@ go run ./cmd/rbn-archive-load -target http://127.0.0.1:8088/ingest/json /tmp/rbn
 go run ./cmd/rbn-telnet-sql-ingest -dry-run -limit 10
 go run ./cmd/rbn-update-cty
 go run ./cmd/swpc-load -from 2026-08-21 -to 2026-08-21 > /tmp/swpc-20260821.jsonl
+go run ./cmd/cabrillo-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log > /tmp/ti8x-contest.jsonl
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-telnet-sql-ingest -qrz-enrich
 ```
@@ -106,6 +109,39 @@ exist:
 ```bash
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/rbn_spot_propagation_base.sql
+```
+
+Install the submitted-log propagation view after the `contest_logs`,
+`contest_qsos`, and SWPC tables exist:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_qso_propagation_base.sql
+```
+
+Load a single Cabrillo contest log through the JSON loader:
+
+```bash
+go run ./cmd/cabrillo-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 1000 \
+  -cty-dat data/cty/cty.dat \
+  https://cqww.com/publiclogs/2025cw/ti8x.log
+```
+
+The loader posts the `contest_logs` parent row first, waits briefly for the QS
+loader to flush it, and then posts the `contest_qsos` child rows. The TI8X CQ WW
+CW 2025 public log currently parses as one parent log and 3,947 QSOs.
+
+```sql
+select q.band, q.worked_continent, d.sfi, k.kp_index, count(*) as qsos
+from contest_qsos q
+inner join swpc_daily_indices d on q.qso_day_key = d.day_key
+inner join swpc_k_indices_3h k on q.qso_3h_bucket_key = k.bucket_key
+where q.station_call = 'TI8X'
+group by q.band, q.worked_continent, d.sfi, k.kp_index
+order by qsos desc
+limit 30;
 ```
 
 ## Near-Term Build Plan

@@ -40,6 +40,63 @@ order by spots desc
 limit 50;
 ```
 
+## `contest_qso_propagation_base`
+
+`contest_qso_propagation_base` is the matching base view for submitted Cabrillo
+contest logs. It starts with `contest_qsos`, joins the `contest_logs` parent
+row, and adds daily plus three-hour SWPC propagation context through the
+precomputed relationship-vector keys.
+
+Create or refresh the view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_qso_propagation_base.sql
+```
+
+Useful smoke queries:
+
+```sql
+select count(*) as qsos
+from contest_qso_propagation_base;
+```
+
+```sql
+select
+  station_call,
+  station_country,
+  claimed_score,
+  log_qso_count
+from contest_qso_propagation_base
+where station_call = 'TI8X'
+limit 1;
+```
+
+```sql
+select
+  band,
+  worked_continent,
+  sfi,
+  kp_index,
+  count(*) as qsos
+from contest_qso_propagation_base
+where station_call = 'TI8X'
+group by band, worked_continent, sfi, kp_index
+order by qsos desc
+limit 30;
+```
+
+```sql
+select
+  worked_prefix,
+  count(*) as qsos
+from contest_qso_propagation_base
+where station_call = 'TI8X'
+group by worked_prefix
+order by qsos desc
+limit 25;
+```
+
 ```sql
 select
   band,
