@@ -41,6 +41,12 @@ func TestMatchQSOsToSpotsUsesWindowAndFrequencyTolerance(t *testing.T) {
 	if math.Abs(matches[0].FrequencyDeltaKHz-0.2) > 0.001 || math.Abs(matches[0].AbsFrequencyDeltaKHz-0.2) > 0.001 {
 		t.Fatalf("frequency deltas = %.3f/%.3f", matches[0].FrequencyDeltaKHz, matches[0].AbsFrequencyDeltaKHz)
 	}
+	if matches[0].MatchRank != 1 || matches[0].IsBestMatch != 1 {
+		t.Fatalf("rank/best = %d/%d", matches[0].MatchRank, matches[0].IsBestMatch)
+	}
+	if matches[0].TimeScore <= 0 || matches[0].FrequencyScore <= 0 || matches[0].MatchScore <= 0 {
+		t.Fatalf("scores were not populated: time=%.3f frequency=%.3f match=%.3f", matches[0].TimeScore, matches[0].FrequencyScore, matches[0].MatchScore)
+	}
 }
 
 func TestMatchQSOsToSpotsCapsClosestMatchesPerQSO(t *testing.T) {
@@ -64,6 +70,39 @@ func TestMatchQSOsToSpotsCapsClosestMatchesPerQSO(t *testing.T) {
 	if matches[0].SpotID != 2 || matches[1].SpotID != 1 {
 		t.Fatalf("closest spots = %d, %d", matches[0].SpotID, matches[1].SpotID)
 	}
+	if matches[0].MatchRank != 1 || matches[0].IsBestMatch != 1 {
+		t.Fatalf("first rank/best = %d/%d", matches[0].MatchRank, matches[0].IsBestMatch)
+	}
+	if matches[1].MatchRank != 2 || matches[1].IsBestMatch != 0 {
+		t.Fatalf("second rank/best = %d/%d", matches[1].MatchRank, matches[1].IsBestMatch)
+	}
+}
+
+func TestMatchQSOsToSpotsUsesSignalAsFinalRankingTieBreaker(t *testing.T) {
+	qsoAt := time.Date(2025, 11, 29, 0, 5, 0, 0, time.UTC)
+	qso := testQSO(qsoAt, 14025)
+	weak := testSpot(1, qsoAt.Add(15*time.Second), 14025.1, "TI8X", "20m", "CW")
+	weak.SignalDB = 9
+	strong := testSpot(2, qsoAt.Add(15*time.Second), 14025.1, "TI8X", "20m", "CW")
+	strong.SignalDB = 31
+
+	matches := MatchQSOsToSpots([]cabrillo.QSO{qso}, []rbn.Spot{weak, strong}, Options{
+		Window:        time.Minute,
+		DenseMatchIDs: true,
+	})
+
+	if got, want := len(matches), 2; got != want {
+		t.Fatalf("len(matches) = %d, want %d", got, want)
+	}
+	if got, want := matches[0].SpotID, uint64(2); got != want {
+		t.Fatalf("best spot id = %d, want %d", got, want)
+	}
+	if matches[0].MatchRank != 1 || matches[0].IsBestMatch != 1 {
+		t.Fatalf("best rank flags = %d/%d", matches[0].MatchRank, matches[0].IsBestMatch)
+	}
+	if matches[1].MatchRank != 2 || matches[1].IsBestMatch != 0 {
+		t.Fatalf("second rank flags = %d/%d", matches[1].MatchRank, matches[1].IsBestMatch)
+	}
 }
 
 func TestNewEventFormatsPayload(t *testing.T) {
@@ -85,6 +124,15 @@ func TestNewEventFormatsPayload(t *testing.T) {
 	}
 	if event.Data.MatchKind != KindSameBucket || event.Data.SameActivityBucket != 1 {
 		t.Fatalf("kind/bucket = %q/%d", event.Data.MatchKind, event.Data.SameActivityBucket)
+	}
+	if math.Abs(event.Data.TimeScore-90.0) > 0.001 {
+		t.Fatalf("time_score = %.3f, want 90.000", event.Data.TimeScore)
+	}
+	if math.Abs(event.Data.FrequencyScore-60.0) > 0.001 {
+		t.Fatalf("frequency_score = %.3f, want 60.000", event.Data.FrequencyScore)
+	}
+	if math.Abs(event.Data.MatchScore-83.2) > 0.001 {
+		t.Fatalf("match_score = %.3f, want 83.200", event.Data.MatchScore)
 	}
 }
 

@@ -266,6 +266,17 @@ order by matches desc
 limit 20;
 " | tee "$out_dir/match-summary.txt"
 
+log "verification best-match summary"
+mysql_exec -e "
+select band, count(*) as best_matches, avg(match_score) as avg_match_score
+from contest_spot_match_base
+where station_call = '$station'
+  and is_best_match = 1
+group by band
+order by best_matches desc
+limit 20;
+" | tee "$out_dir/best-match-summary.txt"
+
 log "verification propagation summary"
 mysql_exec -e "
 select band, dx_prefix, sfi, kp_index, count(*) as spots

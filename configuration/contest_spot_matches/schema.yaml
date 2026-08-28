@@ -234,15 +234,43 @@ attributes:
   mappingStrategy: StringEnum
   type: String
   sourceOrdinal: 38
+- fieldName: time_score
+  sourceName: /data/time_score
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 3
+  sourceOrdinal: 39
+- fieldName: frequency_score
+  sourceName: /data/frequency_score
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 3
+  sourceOrdinal: 40
+- fieldName: match_score
+  sourceName: /data/match_score
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 3
+  sourceOrdinal: 41
+- fieldName: match_rank
+  sourceName: /data/match_rank
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 42
+- fieldName: is_best_match
+  sourceName: /data/is_best_match
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 43
 - fieldName: source
   sourceName: /data/source
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 39
+  sourceOrdinal: 44
 - fieldName: loaded_at
   sourceName: /data/loaded_at
   mappingStrategy: TimestampBSI
   configuration:
     granularity: "second"
   type: DateTime
-  sourceOrdinal: 40
+  sourceOrdinal: 45

@@ -44,6 +44,11 @@ type Payload struct {
 	FrequencyToleranceKHz float64 `json:"frequency_tolerance_khz"`
 	SameActivityBucket    int     `json:"same_activity_bucket"`
 	MatchKind             string  `json:"match_kind"`
+	TimeScore             float64 `json:"time_score"`
+	FrequencyScore        float64 `json:"frequency_score"`
+	MatchScore            float64 `json:"match_score"`
+	MatchRank             int     `json:"match_rank"`
+	IsBestMatch           int     `json:"is_best_match"`
 	Source                string  `json:"source"`
 	LoadedAt              string  `json:"loaded_at"`
 }
@@ -88,6 +93,11 @@ func NewEvent(match Match) Event {
 			FrequencyToleranceKHz: match.FrequencyToleranceKHz,
 			SameActivityBucket:    match.SameActivityBucket,
 			MatchKind:             match.MatchKind,
+			TimeScore:             match.TimeScore,
+			FrequencyScore:        match.FrequencyScore,
+			MatchScore:            match.MatchScore,
+			MatchRank:             match.MatchRank,
+			IsBestMatch:           match.IsBestMatch,
 			Source:                match.Source,
 			LoadedAt:              formatTime(match.LoadedAt),
 		},

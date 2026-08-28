@@ -257,6 +257,18 @@ order by matches desc
 limit 20;
 ```
 
+Best-match smoke:
+
+```sql
+select band, count(*) as best_matches, avg(match_score) as avg_match_score
+from contest_spot_match_base
+where station_call = 'TI8X'
+  and is_best_match = 1
+group by band
+order by best_matches desc
+limit 20;
+```
+
 ## Near-Term Build Plan
 
 1. Benchmarks: compare SQL inserts and streaming loader throughput on the same

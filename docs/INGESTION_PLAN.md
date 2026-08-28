@@ -246,6 +246,12 @@ spots inside the configured time window. By default it uses the same dense
 archive spot ID policy as `rbn-archive-load -dense-spot-ids`, so `spot_ref`
 points at the already loaded `spots_flat` rows.
 
+Each emitted match keeps the full candidate row and adds deterministic ranking
+metadata. `match_rank = 1` and `is_best_match = 1` identify the best spot for a
+QSO. Ranking prefers closest time, then closest frequency, then strongest
+signal, then lowest spot ID. The numeric `match_score` is a zero-to-100 blend
+weighted primarily toward time proximity.
+
 ```bash
 go run ./cmd/contest-spot-match-load \
   -target http://127.0.0.1:8088/ingest/json \
@@ -479,4 +485,4 @@ The useful first joins are:
 - `spots_flat.activity_5m_ref -> activity_5m_buckets.activity_5m_id`
 - RBN spots to SWPC through `spot_day_ref` and `spot_3h_bucket_ref`
 - RBN spots to Cabrillo QSOs by shared activity bucket, or by exact bounded
-  time/frequency proximity through `contest_spot_matches`
+  time/frequency proximity through scored `contest_spot_matches`

@@ -224,7 +224,9 @@ join and is intentionally not the preferred QS modeling path.
 
 Exact spot-to-QSO matching is materialized into `contest_spot_matches`. This
 table records the QSO row, RBN spot row, time delta, frequency delta, and match
-classification after a reproducible source-file matching pass.
+classification after a reproducible source-file matching pass. It also stores
+proximity scores, `match_rank`, and `is_best_match` so analysts can choose
+either the full candidate set or one best spot per QSO.
 
 Focused RBN parsed caches are now the preferred input for iterative exact-match
 jobs. `cmd/rbn-cache-build` scans raw RBN archives once for the submitted

@@ -200,13 +200,27 @@ select
   spotted_at,
   time_delta_seconds,
   abs_frequency_delta_khz,
+  match_rank,
+  match_score,
   spotter_call,
   signal_db
 from contest_spot_match_base
 where station_call = 'TI8X'
   and abs_time_delta_seconds <= 60
-order by signal_db desc
+order by match_score desc
 limit 30;
+```
+
+Best match smoke:
+
+```sql
+select band, count(*) as best_matches, avg(match_score) as avg_match_score
+from contest_spot_match_base
+where station_call = 'TI8X'
+  and is_best_match = 1
+group by band
+order by best_matches desc
+limit 20;
 ```
 
 ## Product Notes
@@ -219,8 +233,9 @@ limit 30;
   still a non-relationship peer join and is rejected by QS. The implemented
   native path is `activity_5m_buckets`, exposed through
   `contest_rbn_activity_5m_base`.
-- Exact spot-to-QSO matching is now represented by `contest_spot_matches`;
-  future work can add richer scoring beyond the first pass.
+- Exact spot-to-QSO matching is now represented by `contest_spot_matches`.
+  Match rows carry deterministic proximity scores, a per-QSO rank, and an
+  `is_best_match` flag while retaining the full candidate set for deeper review.
 - Focused parsed RBN caches are the right middle layer for iterative contest
   analysis. They preserve the dense spot IDs used by focused archive loads and
   let match jobs rerun from day/callsign JSONL instead of scanning raw zips.

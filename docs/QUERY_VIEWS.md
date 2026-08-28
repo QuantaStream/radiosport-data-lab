@@ -204,7 +204,7 @@ path.
 `contest_spot_match_base` is the exact match view over materialized
 `contest_spot_matches` rows. It is the richer analysis surface when five-minute
 bucket correlation is not enough because it includes time delta, frequency
-delta, signal, spotter, and SWPC context.
+delta, score/rank, signal, spotter, and SWPC context.
 
 Create or refresh the view:
 
@@ -238,11 +238,34 @@ select
   spotted_at,
   time_delta_seconds,
   abs_frequency_delta_khz,
+  match_rank,
+  match_score,
+  time_score,
+  frequency_score,
   spotter_call,
   signal_db
 from contest_spot_match_base
 where station_call = 'TI8X'
   and abs_time_delta_seconds <= 60
-order by signal_db desc
+order by match_score desc
+limit 30;
+```
+
+Best match per QSO:
+
+```sql
+select
+  qso_id,
+  qso_at,
+  band,
+  spotter_call,
+  spotted_at,
+  time_delta_seconds,
+  abs_frequency_delta_khz,
+  match_score
+from contest_spot_match_base
+where station_call = 'TI8X'
+  and is_best_match = 1
+order by qso_at
 limit 30;
 ```

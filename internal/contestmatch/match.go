@@ -63,6 +63,11 @@ type Match struct {
 	FrequencyToleranceKHz float64
 	SameActivityBucket    int
 	MatchKind             string
+	TimeScore             float64
+	FrequencyScore        float64
+	MatchScore            float64
+	MatchRank             int
+	IsBestMatch           int
 	Source                string
 	LoadedAt              time.Time
 }
@@ -97,8 +102,12 @@ func MatchQSOsToSpots(qsos []cabrillo.QSO, spots []rbn.Spot, options Options) []
 		if options.MaxMatchesPerQSO > 0 && len(candidates) > options.MaxMatchesPerQSO {
 			candidates = candidates[:options.MaxMatchesPerQSO]
 		}
-		for _, spot := range candidates {
+		for i, spot := range candidates {
 			match := NewMatch(qso, spot, window, options.FrequencyToleranceKHz, loadedAt)
+			match.MatchRank = i + 1
+			if i == 0 {
+				match.IsBestMatch = 1
+			}
 			matches = append(matches, match)
 		}
 	}
@@ -122,6 +131,7 @@ func NewMatch(qso cabrillo.QSO, spot rbn.Spot, window time.Duration, frequencyTo
 	if window <= 0 {
 		window = 5 * time.Minute
 	}
+	timeScore, frequencyScore, matchScore := scoreMatch(absInt(timeDelta), window, math.Abs(frequencyDelta), frequencyToleranceKHz, spot.SignalDB)
 	loadedAt = loadedAt.UTC()
 	if loadedAt.IsZero() {
 		loadedAt = time.Now().UTC()
@@ -163,6 +173,9 @@ func NewMatch(qso cabrillo.QSO, spot rbn.Spot, window time.Duration, frequencyTo
 		FrequencyToleranceKHz: frequencyToleranceKHz,
 		SameActivityBucket:    sameBucket,
 		MatchKind:             kind,
+		TimeScore:             timeScore,
+		FrequencyScore:        frequencyScore,
+		MatchScore:            matchScore,
 		Source:                "materialized",
 		LoadedAt:              loadedAt,
 	}
@@ -214,6 +227,9 @@ func matchingCandidates(qso cabrillo.QSO, spots []rbn.Spot, window time.Duration
 		if leftFreq != rightFreq {
 			return leftFreq < rightFreq
 		}
+		if candidates[i].SignalDB != candidates[j].SignalDB {
+			return candidates[i].SignalDB > candidates[j].SignalDB
+		}
 		return candidates[i].SpotID < candidates[j].SpotID
 	})
 	return candidates
@@ -247,4 +263,41 @@ func absInt(v int) int {
 		return -v
 	}
 	return v
+}
+
+func scoreMatch(absTimeDeltaSeconds int, window time.Duration, absFrequencyDeltaKHz float64, frequencyToleranceKHz float64, signalDB int) (float64, float64, float64) {
+	windowSeconds := window.Seconds()
+	if windowSeconds <= 0 {
+		windowSeconds = (5 * time.Minute).Seconds()
+	}
+	timeScore := 100 * (1 - clamp01(float64(absTimeDeltaSeconds)/windowSeconds))
+
+	var frequencyScore float64
+	if frequencyToleranceKHz > 0 {
+		frequencyScore = 100 * (1 - clamp01(absFrequencyDeltaKHz/frequencyToleranceKHz))
+	} else {
+		frequencyScore = 100 / (1 + math.Max(absFrequencyDeltaKHz, 0))
+	}
+
+	signalScore := clamp(float64(signalDB)*2, 0, 100)
+	matchScore := (timeScore * 0.80) + (frequencyScore * 0.15) + (signalScore * 0.05)
+	return roundScore(timeScore), roundScore(frequencyScore), roundScore(matchScore)
+}
+
+func clamp01(v float64) float64 {
+	return clamp(v, 0, 1)
+}
+
+func clamp(v float64, min float64, max float64) float64 {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+func roundScore(v float64) float64 {
+	return math.Round(v*1000) / 1000
 }

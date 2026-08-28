@@ -246,7 +246,8 @@ submitted log and SWPC time buckets.
 `contest_spot_matches` is the exact materialized analysis table for comparing
 submitted QSOs with RBN spots. The shared `activity_5m_buckets` parent is the
 fast coarse layer; this table preserves the exact spot/QSO pairs that passed a
-matching policy and carries the deltas analysts need to evaluate them.
+matching policy and carries the deltas, deterministic scores, and per-QSO rank
+analysts need to evaluate them.
 
 | Column | Source | Mapper | Notes |
 | --- | --- | --- | --- |
@@ -262,7 +263,9 @@ matching policy and carries the deltas analysts need to evaluate them.
 | `band`, `mode`, `match_kind`, `source` | derived | `StringEnum` | Core dimensions and match classification. |
 | `qso_at`, `spotted_at`, `loaded_at` | QSO/spot/loader | `TimestampBSI` | Time fields. |
 | `qso_frequency_khz`, `spot_frequency_khz`, `frequency_delta_khz`, `abs_frequency_delta_khz` | QSO/spot | `FloatScaleBSI scale=1` | Frequency comparison. |
-| `time_delta_seconds`, `abs_time_delta_seconds`, `signal_db`, `speed_wpm`, `match_window_seconds`, `same_activity_bucket` | derived/spot | `IntBSI` | Match scoring and filter values. |
+| `time_delta_seconds`, `abs_time_delta_seconds`, `signal_db`, `speed_wpm`, `match_window_seconds`, `same_activity_bucket` | derived/spot | `IntBSI` | Match filter and explanation values. |
+| `time_score`, `frequency_score`, `match_score` | derived | `FloatScaleBSI scale=3` | Zero-to-100 proximity scores. Overall score weights time highest, then frequency, then signal strength. |
+| `match_rank`, `is_best_match` | derived | `IntBSI` | Candidate rank within one QSO and a direct flag for the best row. Ranking uses closest time, closest frequency, strongest signal, then lowest spot ID. |
 
 ## Enrichment Failure Rule
 
