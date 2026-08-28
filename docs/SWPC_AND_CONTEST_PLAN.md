@@ -82,22 +82,25 @@ allowlist. The loader commits its native session on graceful shutdown, so
 long-running backfills should either keep the loader up for more batches or stop
 it cleanly before doing a cold readback verification.
 
-Example analytical shape:
+Create the reusable spot/SWPC query view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/rbn_spot_propagation_base.sql
+```
+
+Example analytical shape through that view:
 
 ```sql
 select
-  s.band,
-  s.dx_prefix,
-  d.sfi,
-  k.kp_index,
+  band,
+  dx_prefix,
+  sfi,
+  kp_index,
   count(*) as spots
-from spots_flat s
-inner join swpc_daily_indices d
-  on s.spot_day_ref = d.day_key
-inner join swpc_k_indices_3h k
-  on s.spot_3h_bucket_ref = k.bucket_key
-where s.spotted_at between todate('2025-11-29') and todate('2025-12-01')
-group by s.band, s.dx_prefix, d.sfi, k.kp_index
+from rbn_spot_propagation_base
+where spotted_at between todate('2025-11-29') and todate('2025-12-01')
+group by band, dx_prefix, sfi, kp_index
 order by spots desc
 limit 50;
 ```

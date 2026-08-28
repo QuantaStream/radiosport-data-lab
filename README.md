@@ -18,6 +18,7 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/rbn-qrz-lookup` fetches optional QRZ profiles and can cache them in SQL.
 - `cmd/swpc-load` parses NOAA SWPC solar/geomagnetic indices and emits loader
   events for daily and three-hour propagation tables.
+- `sql/views/` contains reusable analyst-facing views for QS SQL clients.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
@@ -26,6 +27,7 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
   standard-mode backfill and query pass.
 - `docs/SWPC_AND_CONTEST_PLAN.md` defines the historical space-weather and
   Tier 1 Cabrillo contest-log expansion.
+- `docs/QUERY_VIEWS.md` documents reusable views and smoke queries.
 - `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
   distributed flat-loader benchmark and captures a tarball of evidence.
 
@@ -96,6 +98,14 @@ go run ./cmd/swpc-load \
   -from 2025-11-29 \
   -to 2025-11-30 \
   -target http://127.0.0.1:8088/ingest/json
+```
+
+Install the general RBN propagation view after the `spots_flat` and SWPC tables
+exist:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/rbn_spot_propagation_base.sql
 ```
 
 ## Near-Term Build Plan
