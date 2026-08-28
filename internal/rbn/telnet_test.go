@@ -40,6 +40,12 @@ func TestParseTelnetSpot(t *testing.T) {
 	if got, want := spot.TransmitMode, "CW"; got != want {
 		t.Fatalf("transmit mode = %q, want %q", got, want)
 	}
+	if got, want := spot.SpotDayKey, 20260821; got != want {
+		t.Fatalf("spot_day_key = %d, want %d", got, want)
+	}
+	if got, want := spot.Spot3HBucketKey, 2026082100; got != want {
+		t.Fatalf("spot_3h_bucket_key = %d, want %d", got, want)
+	}
 }
 
 func TestParseTelnetSpotUsesUnknownEnrichmentWithoutLookup(t *testing.T) {

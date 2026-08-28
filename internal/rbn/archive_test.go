@@ -40,6 +40,12 @@ func TestReadArchiveCSVSkipsFooter(t *testing.T) {
 	if got, want := spots[0].SpottedAt, time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Fatalf("spotted_at = %s, want %s", got, want)
 	}
+	if got, want := spots[1].SpotDayKey, 20260821; got != want {
+		t.Fatalf("spot_day_key = %d, want %d", got, want)
+	}
+	if got, want := spots[1].Spot3HBucketKey, 2026082100; got != want {
+		t.Fatalf("spot_3h_bucket_key = %d, want %d", got, want)
+	}
 }
 
 func TestReadArchiveCSVUsesFilenameDateFallbackShape(t *testing.T) {
@@ -63,5 +69,11 @@ func TestReadArchiveCSVUsesFilenameDateFallbackShape(t *testing.T) {
 	want := time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)
 	if got := spots[0].SpottedAt; !got.Equal(want) {
 		t.Fatalf("spotted_at = %s, want %s", got, want)
+	}
+	if got, want := spots[0].SpotDayKey, 20260821; got != want {
+		t.Fatalf("spot_day_key = %d, want %d", got, want)
+	}
+	if got, want := spots[0].Spot3HBucketKey, 2026082100; got != want {
+		t.Fatalf("spot_3h_bucket_key = %d, want %d", got, want)
 	}
 }

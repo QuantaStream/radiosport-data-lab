@@ -53,6 +53,8 @@ plus hashes.
 | --- | --- | --- | --- |
 | `spot_id` | generated | `IntBSI` | Stable 63-bit hash, also `columnID`. |
 | `spotted_at` | `date` or telnet UTC minute | `TimestampBSI` | Time quantum field. |
+| `spot_day_key` | derived `YYYYMMDD` | `IntBSI` | UTC day key for SWPC joins and day-level filters. |
+| `spot_3h_bucket_key` | derived `YYYYMMDDHH` | `IntBSI` | UTC three-hour bucket key for K/Kp joins. |
 | `spotter_call` | `callsign` | `StringLexBSI length=8 maxLen=16` | Eight-byte lexical prefix keeps common callsigns in a compact BSI width; uncommon longer callsigns use backing-string rehydration for full projection. |
 | `dx_call` | `dx` | `StringLexBSI length=8 maxLen=16` | Prefix searches such as `LIKE 'N7%'` remain native BSI range predicates while avoiding the wider 16-byte BSI payload. |
 | `dx_call_ref` | `dx` | `ParentRelation -> qrz_callsigns` | Relationship vector for QS-native joins to QRZ enrichment rows. |
@@ -161,8 +163,11 @@ SFI/F10.7-style values.
 | `source` | ingester | `StringEnum` | Source product label. |
 | `loaded_at` | ingester | `TimestampBSI` | Load timestamp. |
 
-Future spot payloads should carry `spot_day_key` and `spot_3h_bucket_key` so RBN
-spots can join directly to these SWPC tables.
+Spot payloads carry `spot_day_key` and `spot_3h_bucket_key` so RBN spots can
+join directly to these SWPC tables. They are plain `IntBSI` fields in the first
+cut so historical archives can be loaded before SWPC parent rows exist; a later
+relationship-vector variant can be added once the SWPC loader guarantees parent
+rows first.
 
 ### `contest_logs`
 

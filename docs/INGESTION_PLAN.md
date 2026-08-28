@@ -12,6 +12,8 @@ should use prepared SQL inserts with sensible batching.
   "data": {
     "spot_id": 123456789,
     "spotted_at": "2026-08-21T00:00:00Z",
+    "spot_day_key": 20260821,
+    "spot_3h_bucket_key": 2026082100,
     "spotter_call": "G4IRN",
     "spotter_prefix": "G",
     "spotter_continent": "EU",
@@ -55,6 +57,8 @@ Initial target:
 insert into spots (
   spot_id,
   spotted_at,
+  spot_day_key,
+  spot_3h_bucket_key,
   spotter_call,
   spotter_prefix,
   spotter_continent,
@@ -68,7 +72,7 @@ insert into spots (
   speed_wpm,
   transmit_mode,
   source
-) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ```
 
 Use prepared statements and client-side batches. The default live-stream policy
@@ -292,10 +296,10 @@ Initial loader payloads:
 }
 ```
 
-Spot payloads should eventually add `spot_day_key` and `spot_3h_bucket_key`.
-Contest QSO payloads already reserve `qso_day_key` and `qso_3h_bucket_key` in
-the schema plan. These precomputed keys make joins deterministic and avoid
-runtime date bucketing as a prerequisite for normal analysis.
+Spot payloads include `spot_day_key` and `spot_3h_bucket_key`. Contest QSO
+payloads already reserve `qso_day_key` and `qso_3h_bucket_key` in the schema
+plan. These precomputed keys make joins deterministic and avoid runtime date
+bucketing as a prerequisite for normal analysis.
 
 ## Cabrillo Contest Log Backfill
 

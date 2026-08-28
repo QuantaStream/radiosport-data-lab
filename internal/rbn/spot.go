@@ -17,6 +17,8 @@ const archiveSpotIDDayStride uint64 = 10000000
 type Spot struct {
 	SpotID           uint64
 	SpottedAt        time.Time
+	SpotDayKey       int
+	Spot3HBucketKey  int
 	SpotterCall      string
 	SpotterPrefix    string
 	SpotterContinent string
@@ -85,6 +87,28 @@ func DenseArchiveSpotID(spottedAt time.Time, zeroBasedOrdinal int) uint64 {
 		unixDay = 0
 	}
 	return uint64(unixDay)*archiveSpotIDDayStride + uint64(zeroBasedOrdinal) + 1
+}
+
+func DayKeyUTC(t time.Time) int {
+	if t.IsZero() {
+		return 0
+	}
+	utc := t.UTC()
+	return utc.Year()*10000 + int(utc.Month())*100 + utc.Day()
+}
+
+func ThreeHourBucketKeyUTC(t time.Time) int {
+	if t.IsZero() {
+		return 0
+	}
+	utc := t.UTC()
+	bucketHour := (utc.Hour() / 3) * 3
+	return DayKeyUTC(utc)*100 + bucketHour
+}
+
+func populateSpotTimeKeys(spot *Spot) {
+	spot.SpotDayKey = DayKeyUTC(spot.SpottedAt)
+	spot.Spot3HBucketKey = ThreeHourBucketKeyUTC(spot.SpottedAt)
 }
 
 func formatFrequencyKHz(freq float64) string {

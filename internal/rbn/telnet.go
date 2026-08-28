@@ -87,6 +87,7 @@ func ParseTelnetSpot(line string, now time.Time, lookup CallsignLookup) (Spot, b
 	if spot.DXContinent == "" {
 		spot.DXContinent = UnknownValue
 	}
+	populateSpotTimeKeys(&spot)
 	spot.SpotID = StableSpotID(spot)
 	return spot, true, nil
 }

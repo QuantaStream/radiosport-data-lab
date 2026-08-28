@@ -126,6 +126,7 @@ func ParseArchiveRecordWithDate(record []string, archiveDate time.Time) (Spot, e
 		TransmitMode:     strings.TrimSpace(record[12]),
 		Source:           SourceArchive,
 	}
+	populateSpotTimeKeys(&spot)
 	spot.SpotID = StableSpotID(spot)
 	return spot, nil
 }

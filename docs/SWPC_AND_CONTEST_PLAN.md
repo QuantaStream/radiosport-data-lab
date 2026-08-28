@@ -47,7 +47,7 @@ Use numeric keys, not date strings:
   bucket, for example `2025113021`
 
 These are compact `IntBSI` primary keys and are also convenient relationship
-targets. Future spot and QSO payloads should carry:
+targets. Spot and QSO payloads should carry:
 
 - `spot_day_key`
 - `spot_3h_bucket_key`
@@ -77,9 +77,8 @@ order by spots desc
 limit 50;
 ```
 
-The example assumes spot payloads have been extended with weather bucket keys.
-The tables are now modeled, but the spot payload extension and SWPC ingester are
-still implementation work.
+The tables and spot payload keys are modeled. The SWPC ingester is still
+implementation work.
 
 ## Cabrillo Tier 1 Scope
 
