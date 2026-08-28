@@ -14,6 +14,35 @@ for both callsigns. Older/minute-only archive shapes can derive the day from the
 file name. The telnet feed is lighter: it arrives as a text line and needs the
 callsign parser to add prefix, continent, and band metadata.
 
+SWPC space-weather data is modeled as small historical index tables keyed by UTC
+day and UTC three-hour bucket. The key values are numeric `YYYYMMDD` and
+`YYYYMMDDHH` integers so spots and contest QSOs can join to propagation context
+without runtime date truncation.
+
+Cabrillo contest logs are modeled in two pieces: one submitted log row and many
+parsed `QSO:` rows. The first ingest scope is Tier 1 Caribbean and Central
+America stations, with final inclusion based on CTY/DXCC parsing.
+
+## Mapper Guidance
+
+Cardinality alone should not decide string mapping. Around 500 distinct values
+is a useful prompt to think, but it is not an automatic `StringLexBSI` threshold.
+
+Use `StringEnum` for categorical values, including fields that may grow into the
+low thousands, when the field is commonly used for `GROUP BY`, `topn()`,
+dashboards, equality filters, or dimensional joins. Bands, modes, continents,
+DXCC prefixes, countries, categories, and statuses all fit this shape.
+
+Use `StringLexBSI` for bounded identifiers. Callsigns, part numbers, customer
+IDs, account IDs, UUID-like values, and source-file identifiers are the natural
+fit. These fields benefit from equality, prefix search, lexical range, and
+direct projection without treating every identifier as a small category.
+
+Use `StringSearch` for unstructured text. Raw comments or long descriptions can
+be searchable if the application needs that behavior. Raw Cabrillo lines should
+stay in source files or object storage and be represented in QS by parsed fields
+plus hashes.
+
 ## Tables
 
 ### `spots`
@@ -101,6 +130,77 @@ QRZ network latency never slows the telnet read/insert path.
 
 Aliases should eventually be normalized into a small `qrz_aliases` table rather
 than stored as one searchable comma-delimited string.
+
+### `swpc_daily_indices`
+
+`swpc_daily_indices` stores one row per UTC day with historical A/Ap and
+SFI/F10.7-style values.
+
+| Column | Source | Mapper | Notes |
+| --- | --- | --- | --- |
+| `day_key` | generated `YYYYMMDD` | `IntBSI` | Primary key and column ID. |
+| `observed_date` | SWPC product date | `TimestampBSI` | UTC day timestamp. |
+| `a_index`, `ap_index` | SWPC daily indices | `IntBSI` | Daily geomagnetic activity values. |
+| `sfi` | SWPC solar flux value | `FloatScaleBSI`, `scale: 1` | F10.7/SFI-style value. |
+| `sunspot_number` | SWPC product value | `IntBSI` | Optional but useful solar context. |
+| `source` | ingester | `StringEnum` | Source product label. |
+| `loaded_at` | ingester | `TimestampBSI` | Load timestamp. |
+
+### `swpc_k_indices_3h`
+
+`swpc_k_indices_3h` stores one row per UTC three-hour K/Kp bucket. Its
+`day_key` is a relationship vector to `swpc_daily_indices`.
+
+| Column | Source | Mapper | Notes |
+| --- | --- | --- | --- |
+| `bucket_key` | generated `YYYYMMDDHH` | `IntBSI` | Primary key and column ID. |
+| `bucket_start` | SWPC product timestamp | `TimestampBSI` | UTC bucket start. |
+| `day_key` | generated `YYYYMMDD` | `ParentRelation` | Joins to `swpc_daily_indices`. |
+| `k_index` | SWPC product value | `IntBSI` | Integer K where available. |
+| `kp_index` | SWPC product value | `FloatScaleBSI`, `scale: 2` | Planetary Kp-style value. |
+| `source` | ingester | `StringEnum` | Source product label. |
+| `loaded_at` | ingester | `TimestampBSI` | Load timestamp. |
+
+Future spot payloads should carry `spot_day_key` and `spot_3h_bucket_key` so RBN
+spots can join directly to these SWPC tables.
+
+### `contest_logs`
+
+`contest_logs` stores one accepted Cabrillo submission. The first ingest scope
+is Tier 1 Caribbean and Central America logs, not all worldwide logs.
+
+| Column | Source | Mapper | Notes |
+| --- | --- | --- | --- |
+| `log_id` | generated | `StringLexBSI length=16 maxLen=96` | Stable log identity. |
+| `contest_id` | source | `StringEnum` | Example: `cqww-cw-2025`. |
+| `station_call` | Cabrillo header | `StringLexBSI length=8 maxLen=16` | Submitted station. |
+| `station_prefix`, `station_continent`, `station_country` | CTY parser | `StringEnum` | Regional classification. |
+| `cq_zone`, `itu_zone` | header or CTY parser | `IntBSI` | Contest geography. |
+| `category_*` | Cabrillo headers | `StringEnum` | Normalized category dimensions. |
+| `claimed_score`, `qso_count` | header/parser | `IntBSI` | Claimed result and parsed size. |
+| `scope_region` | ingester | `StringEnum` | `tier1_caribbean_central_america`. |
+| `source_file` | ingester | `StringLexBSI length=16 maxLen=160` | Source artifact identity. |
+| `loaded_at` | ingester | `TimestampBSI` | Load timestamp. |
+
+### `contest_qsos`
+
+`contest_qsos` stores one parsed Cabrillo `QSO:` line. It links to both the
+submitted log and SWPC time buckets.
+
+| Column | Source | Mapper | Notes |
+| --- | --- | --- | --- |
+| `qso_id` | generated | `IntBSI` | Primary key and column ID. |
+| `log_id` | generated | `ParentRelation` | Joins to `contest_logs`. |
+| `contest_id` | source | `StringEnum` | Keeps common filters local. |
+| `qso_at` | QSO line | `TimestampBSI` | UTC QSO time. |
+| `qso_day_key` | generated `YYYYMMDD` | `ParentRelation` | Joins to `swpc_daily_indices`. |
+| `qso_3h_bucket_key` | generated `YYYYMMDDHH` | `ParentRelation` | Joins to `swpc_k_indices_3h`. |
+| `station_call`, `worked_call` | QSO line | `StringLexBSI length=8 maxLen=16` | Identifier fields. |
+| `station_prefix`, `station_continent`, `worked_prefix`, `worked_continent` | CTY parser | `StringEnum` | Contest geography. |
+| `frequency_khz` | QSO line | `FloatScaleBSI`, `scale: 1` | Comparable with RBN spot frequency. |
+| `band`, `mode` | derived/QSO line | `StringEnum` | Core contest dimensions. |
+| `sent_exchange`, `received_exchange` | QSO line | `StringEnum` | Contest exchange values. |
+| `source_file` | ingester | `StringLexBSI length=16 maxLen=160` | Source artifact identity. |
 
 ## Enrichment Failure Rule
 

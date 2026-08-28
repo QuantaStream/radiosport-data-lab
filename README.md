@@ -20,6 +20,10 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
 - `docs/LOADER_BENCHMARK_20260823.md` records the local flat-loader baseline.
+- `docs/CQWW_2025_STANDARD_BENCHMARK.md` records the two-day CQWW 2025
+  standard-mode backfill and query pass.
+- `docs/SWPC_AND_CONTEST_PLAN.md` defines the historical space-weather and
+  Tier 1 Cabrillo contest-log expansion.
 - `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
   distributed flat-loader benchmark and captures a tarball of evidence.
 
@@ -28,6 +32,10 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - RBN raw daily archives are zipped CSV files published by Reverse Beacon
   Network.
 - The telnet stream emits live spot lines from `telnet.reversebeacon.net`.
+- NOAA SWPC historical indices provide A, K/Kp, and SFI/F10.7 propagation
+  context.
+- Public adjudicated contest logs in Cabrillo format provide a submitted-log
+  truth set. The first planned scope is Caribbean and Central America logs.
 - QRZ XML lookups are optional enrichment and must be configured through
   environment variables. No QRZ credentials belong in this repository.
 
@@ -80,4 +88,4 @@ and `-day-workers N` to parallelize a historical backfill across days.
 2. Query examples: keep Workbench-friendly examples for live spots, QRZ
    enrichment, and relationship joins.
 3. Additional feeds: add more radiosport data sources against the same schema
-   style.
+   style, starting with SWPC indices and Tier 1 Cabrillo contest logs.

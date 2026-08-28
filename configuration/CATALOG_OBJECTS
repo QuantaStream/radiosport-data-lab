@@ -14,3 +14,23 @@ objects:
   object_type: TABLE
   creation_date: 2026-08-23T00:00:00Z
   modification_date: 2026-08-23T00:00:00Z
+- schema_name: quanta
+  table_name: swpc_daily_indices
+  object_type: TABLE
+  creation_date: 2026-08-28T00:00:00Z
+  modification_date: 2026-08-28T00:00:00Z
+- schema_name: quanta
+  table_name: swpc_k_indices_3h
+  object_type: TABLE
+  creation_date: 2026-08-28T00:00:00Z
+  modification_date: 2026-08-28T00:00:00Z
+- schema_name: quanta
+  table_name: contest_logs
+  object_type: TABLE
+  creation_date: 2026-08-28T00:00:00Z
+  modification_date: 2026-08-28T00:00:00Z
+- schema_name: quanta
+  table_name: contest_qsos
+  object_type: TABLE
+  creation_date: 2026-08-28T00:00:00Z
+  modification_date: 2026-08-28T00:00:00Z

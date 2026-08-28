@@ -253,3 +253,85 @@ The spot pipeline must continue when QRZ is unreachable or when a callsign is no
 listed. The command writes `lookup_status='found'` for successful lookups and
 `lookup_status='not_found'` for cache-negative rows. QRZ credentials are runtime
 configuration only; never commit them.
+
+## SWPC Space-Weather Backfill
+
+Historical A, K/Kp, and SFI/F10.7 values should be loaded as independent,
+joinable time-series facts before contest analysis.
+
+Initial loader payloads:
+
+```json
+{
+  "type": "swpc_daily_index",
+  "data": {
+    "day_key": 20251130,
+    "observed_date": "2025-11-30T00:00:00Z",
+    "a_index": 8,
+    "ap_index": 8,
+    "sfi": 185.4,
+    "sunspot_number": 94,
+    "source": "swpc",
+    "loaded_at": "2026-08-28T00:00:00Z"
+  }
+}
+```
+
+```json
+{
+  "type": "swpc_k_index_3h",
+  "data": {
+    "bucket_key": 2025113021,
+    "bucket_start": "2025-11-30T21:00:00Z",
+    "day_key": 20251130,
+    "k_index": 2,
+    "kp_index": 2.33,
+    "source": "swpc",
+    "loaded_at": "2026-08-28T00:00:00Z"
+  }
+}
+```
+
+Spot payloads should eventually add `spot_day_key` and `spot_3h_bucket_key`.
+Contest QSO payloads already reserve `qso_day_key` and `qso_3h_bucket_key` in
+the schema plan. These precomputed keys make joins deterministic and avoid
+runtime date bucketing as a prerequisite for normal analysis.
+
+## Cabrillo Contest Log Backfill
+
+The first Cabrillo ingest scope is Tier 1 Caribbean and Central America contest
+logs. Full worldwide contest logs, and especially full US competitive-landscape
+analysis, should be a later scale milestone.
+
+Initial Tier 1 prefix seed list:
+
+```text
+6Y 8P C6 CM CO FG FM FS HH HI HK0 HP HR J3 J6 J7 J8 KG4 KP2 KP4
+P4 PJ2 PJ4 PJ5 PJ7 TG TI V2 V3 V4 VP2E VP2M VP2V VP5 VP9 XE YN YS ZF 9Y
+```
+
+Use this list for rough filtering and discovery, but use the CTY parser for the
+final inclusion decision.
+
+Initial Cabrillo flow:
+
+1. Download or stage public adjudicated Cabrillo logs for one contest.
+2. Parse headers and `QSO:` lines with first-party code.
+3. Classify submitted station and worked callsigns with CTY/DXCC data.
+4. Keep only Tier 1 submitted-station logs for the first pass.
+5. Emit one `contest_log` event per accepted log.
+6. Emit one `contest_qso` event per parsed QSO.
+7. Store raw Cabrillo source files outside QS for reprocessing and audit.
+
+Hard rejects should be limited to unrecoverable QSO structure. Unknown or
+unusual headers should become explicit `UNKNOWN` or `UNSPECIFIED` enum values so
+the loader can keep moving.
+
+The useful first joins are:
+
+- `contest_qsos.log_id -> contest_logs.log_id`
+- `contest_qsos.qso_day_key -> swpc_daily_indices.day_key`
+- `contest_qsos.qso_3h_bucket_key -> swpc_k_indices_3h.bucket_key`
+- RBN spots to SWPC by spot day/bucket keys after spot payloads are extended
+- RBN spots to Cabrillo QSOs by callsign, band, bounded time window, and
+  frequency proximity

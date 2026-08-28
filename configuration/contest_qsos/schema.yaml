@@ -1,0 +1,118 @@
+tableName: contest_qsos
+primaryKey: qso_id
+selector: type="contest_qso"
+timeQuantumType: YMD
+timeQuantumField: qso_at
+attributes:
+- fieldName: qso_id
+  sourceName: /data/qso_id
+  mappingStrategy: IntBSI
+  type: Integer
+  columnID: true
+  sourceOrdinal: 1
+- fieldName: log_id
+  sourceName: /data/log_id
+  mappingStrategy: ParentRelation
+  foreignKey: contest_logs
+  relationshipArtifacts:
+    parentToChild: true
+  type: String
+  sourceOrdinal: 2
+- fieldName: contest_id
+  sourceName: /data/contest_id
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 3
+- fieldName: qso_at
+  sourceName: /data/qso_at
+  mappingStrategy: TimestampBSI
+  configuration:
+    granularity: "second"
+  type: DateTime
+  sourceOrdinal: 4
+- fieldName: qso_day_key
+  sourceName: /data/qso_day_key
+  mappingStrategy: ParentRelation
+  foreignKey: swpc_daily_indices
+  relationshipArtifacts:
+    parentToChild: true
+  type: Integer
+  sourceOrdinal: 5
+- fieldName: qso_3h_bucket_key
+  sourceName: /data/qso_3h_bucket_key
+  mappingStrategy: ParentRelation
+  foreignKey: swpc_k_indices_3h
+  relationshipArtifacts:
+    parentToChild: true
+  type: Integer
+  sourceOrdinal: 6
+- fieldName: station_call
+  sourceName: /data/station_call
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "8"
+  type: String
+  maxLen: 16
+  sourceOrdinal: 7
+- fieldName: station_prefix
+  sourceName: /data/station_prefix
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 8
+- fieldName: station_continent
+  sourceName: /data/station_continent
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 9
+- fieldName: worked_call
+  sourceName: /data/worked_call
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "8"
+  type: String
+  maxLen: 16
+  sourceOrdinal: 10
+- fieldName: worked_prefix
+  sourceName: /data/worked_prefix
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 11
+- fieldName: worked_continent
+  sourceName: /data/worked_continent
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 12
+- fieldName: frequency_khz
+  sourceName: /data/frequency_khz
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 1
+  sourceOrdinal: 13
+- fieldName: band
+  sourceName: /data/band
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 14
+- fieldName: mode
+  sourceName: /data/mode
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 15
+- fieldName: sent_exchange
+  sourceName: /data/sent_exchange
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 16
+- fieldName: received_exchange
+  sourceName: /data/received_exchange
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 17
+- fieldName: source_file
+  sourceName: /data/source_file
+  mappingStrategy: StringLexBSI
+  configuration:
+    length: "16"
+  type: String
+  maxLen: 160
+  sourceOrdinal: 18

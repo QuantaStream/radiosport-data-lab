@@ -1,0 +1,52 @@
+tableName: swpc_daily_indices
+primaryKey: day_key
+selector: type="swpc_daily_index"
+timeQuantumType: YMD
+timeQuantumField: observed_date
+attributes:
+- fieldName: day_key
+  sourceName: /data/day_key
+  mappingStrategy: IntBSI
+  type: Integer
+  columnID: true
+  sourceOrdinal: 1
+- fieldName: observed_date
+  sourceName: /data/observed_date
+  mappingStrategy: TimestampBSI
+  configuration:
+    granularity: "second"
+  type: DateTime
+  sourceOrdinal: 2
+- fieldName: a_index
+  sourceName: /data/a_index
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 3
+- fieldName: ap_index
+  sourceName: /data/ap_index
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 4
+- fieldName: sfi
+  sourceName: /data/sfi
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 1
+  sourceOrdinal: 5
+- fieldName: sunspot_number
+  sourceName: /data/sunspot_number
+  mappingStrategy: IntBSI
+  type: Integer
+  sourceOrdinal: 6
+- fieldName: source
+  sourceName: /data/source
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 7
+- fieldName: loaded_at
+  sourceName: /data/loaded_at
+  mappingStrategy: TimestampBSI
+  configuration:
+    granularity: "second"
+  type: DateTime
+  sourceOrdinal: 8
