@@ -39,6 +39,10 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
   Tier 1 Cabrillo contest-log expansion.
 - `docs/SPOTTER_PROFILES_DESIGN.md` sketches spotter calibration, weighted SNR,
   and reach-scoring tables/views.
+- `docs/RUNNING_LAB.md` is the local restart, health-check, and workflow
+  runbook.
+- `docs/QUERY_SAMPLER.md` contains copy/paste SQL for Workbench, Tableau, and
+  CLI exploration.
 - `docs/QUERY_VIEWS.md` documents reusable views and smoke queries.
 - `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
   distributed flat-loader benchmark and captures a tarball of evidence.

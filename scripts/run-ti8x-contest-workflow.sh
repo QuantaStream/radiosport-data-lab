@@ -112,7 +112,7 @@ mysql_exec() {
 }
 
 admin() {
-  (cd "$qs_repo" && go run ./quanta-admin "$@")
+  (cd "$qs_repo" && go run ./qstream-admin "$@")
 }
 
 capture_loader_stats() {

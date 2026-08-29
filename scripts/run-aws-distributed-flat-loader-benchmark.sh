@@ -119,7 +119,7 @@ printf '%s\n' "${archives[@]}" > "$out_dir/archives.txt"
 log "checking cluster status"
 (
   cd "$qs_repo"
-  go run ./quanta-admin status
+  go run ./qstream-admin status
 ) | tee "$out_dir/cluster-status-before.txt"
 
 log "checking loader health"
@@ -130,7 +130,7 @@ capture_json "$loader_url/stats" "$out_dir/loader-stats-before.json"
 log "truncating spots_flat"
 (
   cd "$qs_repo"
-  go run ./quanta-admin truncate spots_flat
+  go run ./qstream-admin truncate spots_flat
 ) | tee "$out_dir/truncate.log"
 mysql_exec -e 'select count(*) as spots_flat_before from spots_flat;' | tee "$out_dir/count-before.txt"
 
