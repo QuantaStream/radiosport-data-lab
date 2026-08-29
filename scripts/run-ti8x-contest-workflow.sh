@@ -21,6 +21,7 @@ frequency_tolerance="${CONTEST_FREQUENCY_TOLERANCE_KHZ:-0}"
 max_matches="${CONTEST_MAX_MATCHES_PER_QSO:-0}"
 parent_flush_wait="${RBN_PARENT_FLUSH_WAIT:-2s}"
 loader_wait_seconds="${RBN_LOADER_WAIT_SECONDS:-900}"
+profile_build="${RBN_PROFILE_BUILD:-1}"
 out_dir="${RBN_WORKFLOW_DIR:-/tmp/radiosport-ti8x-workflow-$(date -u +%Y%m%dT%H%M%SZ)}"
 reset=0
 install_views=1
@@ -40,7 +41,8 @@ QuantaStream server and qstream-loader:
   5. build a parsed RBN day/callsign cache
   6. load Cabrillo QSOs
   7. materialize exact spot/QSO matches from the cache
-  8. install analyst views and print verification queries
+  8. build spotter calibration profiles
+  9. install analyst views and print verification queries
 
 Environment overrides:
   QS_REPO=$qs_repo
@@ -52,6 +54,7 @@ Environment overrides:
   CONTEST_STATION=$station
   CONTEST_LOG_URL=$contest_log
   RBN_CACHE_DIR=$cache_dir
+  RBN_PROFILE_BUILD=$profile_build
 USAGE
 }
 
@@ -201,14 +204,14 @@ printf '\n' >> "$out_dir/loader-health.json"
 capture_loader_stats "before"
 
 if [ "$create_schema" = "1" ]; then
-  for table in swpc_daily_indices swpc_k_indices_3h activity_5m_buckets spots_flat contest_logs contest_qsos contest_spot_matches; do
+  for table in swpc_daily_indices swpc_k_indices_3h activity_5m_buckets spots_flat contest_logs contest_qsos contest_spot_matches rbn_spotter_nodes spotter_profile_snapshots spotter_profiles; do
     log "create table ${table}"
     admin create --port="$mysql_port" --schema-dir="$app_repo/configuration" "$table" 2>&1 | tee -a "$out_dir/schema-create.log"
   done
 fi
 
 if [ "$reset" = "1" ]; then
-  for table in contest_spot_matches contest_qsos spots_flat swpc_k_indices_3h contest_logs activity_5m_buckets swpc_daily_indices; do
+  for table in spotter_profile_snapshots spotter_profiles rbn_spotter_nodes contest_spot_matches contest_qsos spots_flat swpc_k_indices_3h contest_logs activity_5m_buckets swpc_daily_indices; do
     log "truncate table ${table}"
     admin truncate --port="$mysql_port" "$table" 2>&1 | tee -a "$out_dir/truncate.log"
   done
@@ -227,6 +230,13 @@ capture_loader_stats "after-spots"
 run_step rbn-cache-build \
   bash -lc "cd '$app_repo' && go run ./cmd/rbn-cache-build -cache-dir '$cache_dir' -dx-call '$station' -dense-spot-ids ${archives[*]}"
 
+if [ "$profile_build" = "1" ]; then
+  run_step spotter-profile-build \
+    bash -lc "cd '$app_repo' && go run ./cmd/spotter-profile-build -mysql-dsn '${mysql_user}@tcp(${mysql_host}:${mysql_port})/${mysql_db}?parseTime=true' -target '$loader_url/ingest/json' -from '$from_day' -to '$to_day 23:59:59' -profile-kind contest -source-table spots_flat -batch-size '$batch_size' -parent-flush-wait '$parent_flush_wait'"
+  wait_loader_idle
+  capture_loader_stats "after-spotter-profiles"
+fi
+
 run_step cabrillo-load \
   bash -lc "cd '$app_repo' && go run ./cmd/cabrillo-load -target '$loader_url/ingest/json' -batch-size '$batch_size' -parent-flush-wait '$parent_flush_wait' ${cty_args[*]} '$contest_log'"
 wait_loader_idle
@@ -244,6 +254,7 @@ if [ "$install_views" = "1" ]; then
   run_mysql_file "$app_repo/sql/views/contest_rbn_activity_5m_base.sql"
   run_mysql_file "$app_repo/sql/views/contest_spot_match_base.sql"
   run_mysql_file "$app_repo/sql/views/contest_best_spot_match_base.sql"
+  run_mysql_file "$app_repo/sql/views/spotter_profile_base.sql"
 fi
 
 log "verification counts"
@@ -255,6 +266,7 @@ select count(*) as spots_flat_count, min(spotted_at), max(spotted_at) from spots
 select count(*) as contest_log_count from contest_logs;
 select count(*) as contest_qso_count, min(qso_at), max(qso_at) from contest_qsos;
 select count(*) as contest_spot_match_count from contest_spot_matches;
+select count(*) as spotter_profile_count from spotter_profiles;
 " | tee "$out_dir/counts.txt"
 
 log "verification match summary"
@@ -276,6 +288,14 @@ group by band
 order by best_matches desc
 limit 20;
 " | tee "$out_dir/best-match-summary.txt"
+
+log "verification spotter profile summary"
+mysql_exec -e "
+select spotter_call, spotter_continent, total_spots, active_hours, avg_signal_db, spotter_weight, profile_quality
+from spotter_profile_base
+order by total_spots desc
+limit 20;
+" | tee "$out_dir/spotter-profile-summary.txt"
 
 log "verification propagation summary"
 mysql_exec -e "

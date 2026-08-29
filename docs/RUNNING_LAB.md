@@ -99,7 +99,7 @@ tmux attach -t qs-radiosport
 
 Start the loader with every RadioSport table in the allowlist. Keeping the full
 allowlist active makes it possible to load SWPC rows, RBN spots, Cabrillo QSOs,
-and materialized match rows without restarting the loader.
+materialized match rows, and spotter profile rows without restarting the loader.
 
 ```bash
 cd ~/projects/quantastream
@@ -116,7 +116,7 @@ exec /tmp/qs-radiosport-loader \
   -listen 127.0.0.1:8088 \
   -config-dir $HOME/projects/radiosport-data-lab/configuration \
   -database quanta \
-  -tables spots,spots_flat,qrz_callsigns,swpc_daily_indices,swpc_k_indices_3h,activity_5m_buckets,contest_logs,contest_qsos,contest_spot_matches \
+  -tables spots,spots_flat,qrz_callsigns,swpc_daily_indices,swpc_k_indices_3h,activity_5m_buckets,contest_logs,contest_qsos,contest_spot_matches,rbn_spotter_nodes,spotter_profile_snapshots,spotter_profiles \
   -workers 4 \
   -channel-size 100000 \
   -physical-build-routing \
@@ -152,6 +152,7 @@ show tables;
 select count(*) as spots_flat_count from spots_flat;
 select count(*) as qso_count from contest_qsos;
 select count(*) as match_count from contest_spot_matches;
+select count(*) as spotter_profile_count from spotter_profiles;
 "
 ```
 
@@ -163,6 +164,7 @@ the latest workflow reload:
 | `spots_flat` | 5,423 rows |
 | `contest_qsos` | 3,947 rows |
 | `contest_spot_matches` | 81,248 rows |
+| `spotter_profiles` | hundreds of rows |
 | `swpc_daily_indices` | 2 rows |
 | `swpc_k_indices_3h` | 16 rows |
 
@@ -187,6 +189,8 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_spot_match_base.sql
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_best_spot_match_base.sql
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/spotter_profile_base.sql
 ```
 
 ## Reload The Focused TI8X Workflow
@@ -194,7 +198,9 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
 The workflow expects QS and `qstream-loader` to already be running. It creates
 tables if needed, truncates child-first when `--reset` is supplied, reloads SWPC
 context, loads focused RBN rows for TI8X, loads the public Cabrillo log,
-materializes exact QSO-to-spot matches, and refreshes views.
+materializes exact QSO-to-spot matches, builds current spotter calibration
+profiles, and refreshes views. Set `RBN_PROFILE_BUILD=0` to skip profile
+generation during quick parser-only iterations.
 
 ```bash
 cd ~/projects/radiosport-data-lab
@@ -211,6 +217,7 @@ Default inputs:
 | Station | `TI8X` |
 | CTY file | `data/cty/cty.dat` |
 | Loader URL | `http://127.0.0.1:8088` |
+| Spotter profile build | enabled; set `RBN_PROFILE_BUILD=0` to skip |
 
 Override examples:
 
@@ -233,8 +240,8 @@ Good first Tableau tables/views:
 - `contest_spot_match_base`
 - `contest_qso_propagation_base`
 - `rbn_spot_propagation_base`
+- `spotter_profile_base`
 
 If Tableau gets confused during metadata discovery, enable command tracing by
 starting QS with `QUANTASTREAM_MYSQL_COMMAND_TRACE=true`, reproduce the issue,
 and inspect `/tmp/qs-radiosport-standard.log`.
-

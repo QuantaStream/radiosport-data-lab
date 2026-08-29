@@ -24,6 +24,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
   `contest_logs`, `activity_5m_buckets`, and `contest_qsos` loader events.
 - `cmd/contest-spot-match-load` materializes QSO-to-RBN spot matches from a
   Cabrillo log and matching RBN archive files.
+- `cmd/spotter-profile-build` computes current RBN spotter calibration profiles
+  from loaded spot data and emits loader events.
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
 - `scripts/run-ti8x-contest-workflow.sh` runs the focused TI8X contest
   load/cache/match/view workflow against a running QS server and loader.
@@ -72,6 +74,7 @@ go run ./cmd/rbn-update-cty
 go run ./cmd/swpc-load -from 2026-08-21 -to 2026-08-21 > /tmp/swpc-20260821.jsonl
 go run ./cmd/cabrillo-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log > /tmp/ti8x-contest.jsonl
 go run ./cmd/contest-spot-match-load -target "" -rbn-cache /tmp/rbn-cache-ti8x https://cqww.com/publiclogs/2025cw/ti8x.log 2025-11-29 2025-11-30 > /tmp/ti8x-matches.jsonl
+go run ./cmd/spotter-profile-build -target "" -from 2025-11-29 -to 2025-12-01 > /tmp/spotter-profiles.jsonl
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-telnet-sql-ingest -qrz-enrich
 ```
@@ -120,9 +123,10 @@ files.
 
 SWPC backfills use the same loader endpoint. Start `qstream-loader` with
 `activity_5m_buckets`, `spots_flat`, `contest_logs`, `contest_qsos`,
-`swpc_daily_indices`, and `swpc_k_indices_3h` in its `-tables` allowlist when
-running the full contest reload. Historical annual SWPC files are cached under
-`data/swpc` when `-year` is used:
+`contest_spot_matches`, `rbn_spotter_nodes`, `spotter_profile_snapshots`,
+`spotter_profiles`, `swpc_daily_indices`, and `swpc_k_indices_3h` in its
+`-tables` allowlist when running the full contest reload. Historical annual
+SWPC files are cached under `data/swpc` when `-year` is used:
 
 ```bash
 go run ./cmd/swpc-load \
@@ -166,6 +170,8 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_spot_match_base.sql
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_best_spot_match_base.sql
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/spotter_profile_base.sql
 ```
 
 The match views expose Tableau-friendly UTC date parts such as `qso_hour`,

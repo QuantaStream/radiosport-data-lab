@@ -21,6 +21,7 @@ select count(*) as qso_count from contest_qsos;
 select count(*) as match_count from contest_spot_matches;
 select count(*) as swpc_daily_count from swpc_daily_indices;
 select count(*) as swpc_k_count from swpc_k_indices_3h;
+select count(*) as spotter_profile_count from spotter_profiles;
 ```
 
 ```sql
@@ -290,6 +291,45 @@ limit 20;
 Use `contest_spot_match_base` for exact materialized time/frequency matches.
 Use `contest_rbn_activity_5m_base` for broader bucket-level activity analysis.
 
+## Spotter Profiles
+
+Top spotters in the current calibration window:
+
+```sql
+select
+  spotter_call,
+  spotter_continent,
+  total_spots,
+  active_hours,
+  distinct_dx_calls,
+  avg_signal_db,
+  p50_signal_db,
+  p90_signal_db,
+  spotter_weight,
+  profile_quality
+from spotter_profile_base
+order by total_spots desc
+limit 25;
+```
+
+Spotter calibration shape by continent:
+
+```sql
+select
+  spotter_continent,
+  profile_quality,
+  count(*) as spotters,
+  sum(total_spots) as spots,
+  avg(avg_signal_db) as avg_spotter_baseline
+from spotter_profile_base
+group by spotter_continent, profile_quality
+order by spots desc;
+```
+
+These rows are calibration metadata. The first weighting policy is deliberately
+simple: high-volume spotters get `spotter_weight = 1 / sqrt(total_spots)`, while
+`normalization_offset_db` starts as the spotter's average reported signal.
+
 ## Tableau-Friendly Starts
 
 Use these views as first Tableau logical tables:
@@ -300,8 +340,8 @@ Use these views as first Tableau logical tables:
 | `contest_spot_match_base` | spotter quality and match-rank inspection |
 | `contest_qso_propagation_base` | QSO volume by band, worked continent, SFI, Kp |
 | `rbn_spot_propagation_base` | RBN spot volume by band, prefix, SFI, Kp |
+| `spotter_profile_base` | spotter volume, baseline signal, and calibration quality |
 
 Calculated fields that are already exposed as columns in the views should be
 used directly in Tableau when possible. For example, prefer `qso_hour` over a
 generated Tableau `DATEPART` expression during early compatibility testing.
-
