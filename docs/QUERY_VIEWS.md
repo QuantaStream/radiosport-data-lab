@@ -91,6 +91,9 @@ from contest_qso_propagation_base;
 select
   station_call,
   station_country,
+  station_latitude,
+  station_longitude,
+  station_geo_confidence,
   claimed_score,
   log_qso_count
 from contest_qso_propagation_base
@@ -282,3 +285,146 @@ where station_call = 'TI8X'
 order by qso_at
 limit 30;
 ```
+
+## `spotter_profile_base`
+
+`spotter_profile_base` is the current calibration surface for RBN receiving
+stations. The first implementation is computed from `spots_flat` and stores one
+current profile row per `spotter_call`, plus immutable rows in
+`spotter_profile_snapshots`.
+
+Create or refresh the view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/spotter_profile_base.sql
+```
+
+Build or refresh profiles from the currently loaded spot window:
+
+```bash
+go run ./cmd/spotter-profile-build \
+  -target http://127.0.0.1:8088/ingest/json \
+  -from 2025-11-29 \
+  -to 2025-12-01 \
+  -profile-kind contest \
+  -source-table spots_flat \
+  -cty-dat data/cty/cty.dat
+```
+
+Useful smoke queries:
+
+```sql
+select
+  spotter_call,
+  spotter_continent,
+  country_name,
+  latitude,
+  longitude,
+  geo_confidence,
+  total_spots,
+  active_hours,
+  avg_signal_db,
+  p50_signal_db,
+  p90_signal_db,
+  spotter_weight,
+  profile_quality
+from spotter_profile_base
+order by total_spots desc
+limit 25;
+```
+
+```sql
+select
+  spotter_call,
+  country_name,
+  latitude,
+  longitude,
+  geo_source,
+  geo_confidence,
+  total_spots
+from spotter_profile_base
+where geo_confidence = 'COUNTRY_CENTROID'
+order by total_spots desc
+limit 25;
+```
+
+```sql
+select
+  spotter_continent,
+  profile_quality,
+  count(*) as spotters,
+  sum(total_spots) as spots,
+  avg(avg_signal_db) as avg_spotter_baseline
+from spotter_profile_base
+group by spotter_continent, profile_quality
+order by spots desc;
+```
+
+Use `spotter_weight` as the denominator weight for early weighted-SNR
+experiments. Runtime joins from match views to `spotter_profiles` are not the
+preferred QS path yet; materialize weighted match rows or add profile references
+to future match rows when the metric settles.
+
+## `station_activity_5m_base`
+
+`station_activity_5m_base` is the first missed-openings foundation view. It is
+materialized from `spots_flat` by `cmd/station-activity-build` and stores one
+row per DX station, band, mode, five-minute bucket, and spotter continent. The
+builder also emits an `ALL` continent rollup for each bucket by default.
+
+Create or refresh the view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/station_activity_5m_base.sql
+```
+
+Build station activity from the currently loaded spot window:
+
+```bash
+go run ./cmd/station-activity-build \
+  -target http://127.0.0.1:8088/ingest/json \
+  -from 2025-11-29 \
+  -to 2025-12-01 \
+  -dx-call TI8X \
+  -source-table spots_flat
+```
+
+Useful smoke queries:
+
+```sql
+select
+  dx_call,
+  band,
+  bucket_hour,
+  spotter_continent,
+  spot_count,
+  distinct_spotters,
+  avg_signal_db,
+  reach_score
+from station_activity_5m_base
+where dx_call = 'TI8X'
+order by reach_score desc
+limit 25;
+```
+
+```sql
+select
+  bucket_hour,
+  band,
+  spotter_continent,
+  sum(spot_count) as spots,
+  sum(distinct_spotters) as spotter_observations,
+  avg(avg_signal_db) as avg_signal_db,
+  avg(reach_score) as avg_reach_score
+from station_activity_5m_base
+where dx_call = 'TI8X'
+group by bucket_hour, band, spotter_continent
+order by bucket_hour, band, spots desc
+limit 200;
+```
+
+The next missed-openings step is a peer/cohort comparison table that can mark
+activity buckets where similar stations were broadly heard but the target
+station was absent or weak.

@@ -43,6 +43,10 @@ For RBN analysis, spotter calibration is tracked separately from raw spots. See
 `spotter_profile_snapshots`, and `spotter_profiles` tables, plus weighted SNR
 and reach-scoring notes.
 
+Missed-opening analysis starts with materialized five-minute station activity
+summaries. See `MISSED_OPENINGS_DESIGN.md` for the
+`station_activity_5m_summaries` table and `station_activity_5m_base` view.
+
 Use `StringSearch` for unstructured text. Raw comments or long descriptions can
 be searchable if the application needs that behavior. Raw Cabrillo lines should
 stay in source files or object storage and be represented in QS by parsed fields
@@ -216,6 +220,8 @@ is Tier 1 Caribbean and Central America logs, not all worldwide logs.
 | `station_call` | Cabrillo header | `StringLexBSI length=8 maxLen=16` | Submitted station. |
 | `station_prefix`, `station_continent`, `station_country` | CTY parser | `StringEnum` | Regional classification. |
 | `cq_zone`, `itu_zone` | header or CTY parser | `IntBSI` | Contest geography. |
+| `station_latitude`, `station_longitude` | CTY parser | `FloatScaleBSI scale=4` | Country centroid normalized to standard GIS longitude. |
+| `station_geo_source`, `station_geo_confidence` | CTY parser | `StringEnum` | Coordinate provenance, currently `CTY_COUNTRY` / `COUNTRY_CENTROID`. |
 | `category_*` | Cabrillo headers | `StringEnum` | Normalized category dimensions. |
 | `claimed_score`, `qso_count` | header/parser | `IntBSI` | Claimed result and parsed size. |
 | `scope_region` | ingester | `StringEnum` | `tier1_caribbean_central_america`. |
@@ -282,6 +288,13 @@ Spot ingestion is lossless-first. If the core spot structure is valid but DXCC o
 QRZ enrichment fails, the spot row is still inserted. Prefix and continent fields
 fall back to `UNKNOWN`, and enrichment failures should be counted/logged for
 parser improvement work.
+
+CTY country rows also provide coarse latitude/longitude. The app stores those as
+country centroids with `geo_source='CTY_COUNTRY'` and
+`geo_confidence='COUNTRY_CENTROID'`. CTY longitude is positive west; ingesters
+normalize it to standard east-positive longitude before writing QS rows. Treat
+these coordinates as mapping and cohort-analysis hints until QRZ, grid-square,
+or authoritative node metadata is available.
 
 Hard rejects are limited to malformed spot structure, invalid core callsign
 shape, unparseable frequency, unparseable signal/speed, or unusable timestamp.

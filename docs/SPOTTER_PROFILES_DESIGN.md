@@ -21,7 +21,7 @@ the loudest skimmers?
 The answer needs both raw observations and a calibration layer for spotter
 behavior.
 
-## Proposed Tables
+## Tables
 
 ### `rbn_spotter_nodes`
 
@@ -35,6 +35,9 @@ machine-readable feed.
 | `spotter_prefix` | `StringEnum` | CTY/DXCC prefix for the node. |
 | `spotter_continent` | `StringEnum` | Node continent. |
 | `grid` | `StringLexBSI length=8 maxLen=16` | Maidenhead grid when available. |
+| `latitude`, `longitude` | `FloatScaleBSI scale=4` | Best known node location. CTY-derived rows use country centroids. |
+| `geo_source` | `StringEnum` | Location source such as `CTY_COUNTRY`, later `QRZ` or `RBN_NODE`. |
+| `geo_confidence` | `StringEnum` | Precision label such as `COUNTRY_CENTROID`, later `GRID` or `STATION`. |
 | `dxcc_id` | `IntBSI` | DXCC numeric identifier when available. |
 | `country_name` | `StringEnum` | Human-readable country. |
 | `cq_zone` | `IntBSI` | CQ zone. |
@@ -61,6 +64,11 @@ band-specific.
 | `profile_id` | `StringLexBSI length=16 maxLen=96` | Stable key: spotter/window/profile kind. |
 | `spotter_call_ref` | `ParentRelation -> rbn_spotter_nodes` | Relationship to node metadata when present. |
 | `spotter_call` | `StringLexBSI length=8 maxLen=16` | Query-friendly copy. |
+| `spotter_prefix`, `spotter_continent` | `StringEnum` | CTY/DXCC classification for the spotter. |
+| `country_name` | `StringEnum` | CTY/DXCC country label for the spotter. |
+| `cq_zone`, `itu_zone` | `IntBSI` | CTY/DXCC zone hints for coarse analysis. |
+| `latitude`, `longitude` | `FloatScaleBSI scale=4` | Best known spotter location. CTY-derived rows use country centroids. |
+| `geo_source`, `geo_confidence` | `StringEnum` | Coordinate provenance and precision. |
 | `profile_kind` | `StringEnum` | `contest`, `daily`, `rolling_30d`, etc. |
 | `window_start` | `TimestampBSI` | Inclusive UTC window start. |
 | `window_end` | `TimestampBSI` | Exclusive UTC window end. |
@@ -92,7 +100,10 @@ the latest accepted snapshot, or update it in place.
 | `spotter_call` | `StringLexBSI length=8 maxLen=16` | Primary key. |
 | `spotter_prefix` | `StringEnum` | From node metadata or CTY parser. |
 | `spotter_continent` | `StringEnum` | From node metadata or CTY parser. |
-| `grid` | `StringLexBSI length=8 maxLen=16` | Optional node grid. |
+| `country_name` | `StringEnum` | Human-readable country. |
+| `cq_zone`, `itu_zone` | `IntBSI` | Contest geography hints. |
+| `latitude`, `longitude` | `FloatScaleBSI scale=4` | Best known spotter location. CTY-derived rows use country centroids. |
+| `geo_source`, `geo_confidence` | `StringEnum` | Coordinate provenance and precision. |
 | `total_spots` | `IntBSI` | Current calibration volume. |
 | `active_days` | `IntBSI` | Active-day count. |
 | `avg_signal_db` | `FloatScaleBSI scale=2` | Mean spotter signal report. |
@@ -160,7 +171,7 @@ materialized so formulas can evolve.
 
 ## Builder Job
 
-Add a command such as:
+The first implementation is:
 
 ```bash
 go run ./cmd/spotter-profile-build \
@@ -168,43 +179,58 @@ go run ./cmd/spotter-profile-build \
   -from 2025-11-29 \
   -to 2025-12-01 \
   -profile-kind contest \
-  -source-table spots_flat
+  -source-table spots_flat \
+  -cty-dat data/cty/cty.dat
 ```
 
-The first implementation can:
+It currently:
 
-1. Query `spots_flat` through QS or read a parsed archive cache.
-2. Group by `spotter_call`, with optional band/mode windows.
-3. Compute volume, active days/hours, signal summary, and weights.
-4. Emit `rbn_spotter_nodes` stubs for unknown spotters.
-5. Emit `spotter_profile_snapshots`.
-6. Emit or update `spotter_profiles`.
+1. Queries `spots_flat` through QS.
+2. Groups by `spotter_call`, with optional band/mode windows.
+3. Computes volume, active days/hours, signal summary, and weights.
+4. Emits `rbn_spotter_nodes` stubs for unknown spotters.
+5. Emits `spotter_profile_snapshots`.
+6. Emits or updates `spotter_profiles`.
+
+When CTY data is available, the builder enriches each spotter with country,
+zone, continent, and a country-centroid latitude/longitude. CTY longitude uses a
+positive-west convention, so the ingester normalizes it to standard
+east-positive GIS coordinates before writing QS rows. These fields are useful
+for maps and continent/cohort rollups, but they are not station-grade antenna
+locations. Later QRZ, grid-square, or RBN-node metadata can replace them with
+higher-confidence coordinates while preserving the same `geo_source` and
+`geo_confidence` contract.
 
 For high-volume archive runs, reading parsed archive files or a cache may be
 faster than querying QS for all raw rows. For correctness, the profile job should
 record its source window and source files so results are reproducible.
 
-## Views
+## Views And Match Integration
 
 Add a Tableau-facing view after the profile tables exist:
 
 ```text
-contest_weighted_spot_match_base
+spotter_profile_base
 ```
 
-The view should start from `contest_best_spot_match_base` and join
-`spotter_profiles` by `spotter_call`. It should expose:
+The first view exposes the current per-spotter profile. Runtime joins from match
+views to `spotter_profiles` are intentionally deferred until profile references
+are materialized into match rows or the QS peer-join path is broadened. It should
+expose:
 
 | Column | Meaning |
 | --- | --- |
-| `signal_db` | Raw RBN signal report. |
 | `spotter_weight` | Current calibration weight. |
-| `weighted_signal_db` | `signal_db * spotter_weight`. |
-| `spotter_avg_signal_db` | Spotter baseline. |
-| `normalized_signal_db` | Raw signal minus baseline. |
+| `avg_signal_db` | Spotter baseline. |
+| `normalization_offset_db` | Current offset for normalized SNR. |
 | `profile_quality` | Whether the calibration is trustworthy. |
+| `total_spots` | Spotter volume during the source window. |
+| `active_hours` | Spotter activity spread. |
+| `latitude`, `longitude` | Map coordinates for the spotter, with provenance. |
+| `geo_source`, `geo_confidence` | Whether the location came from a country centroid or a more precise source. |
 
-Useful Tableau aggregate fields:
+After weighted match rows are materialized, useful Tableau aggregate fields
+should look like:
 
 ```sql
 select
@@ -237,6 +263,10 @@ match summary table.
 - This design is also a useful QuantaStream product story: raw streaming facts,
   compact bitmap-native identifiers, relationship-vector joins, and derived
   analyst views.
+- `station_activity_5m_summaries` is the next derived layer above raw spots.
+  It groups a station's five-minute audibility by band, mode, and spotter
+  continent so missed-opening analysis can compare station activity against a
+  peer cohort without runtime interval joins.
 
 ## Open Questions
 

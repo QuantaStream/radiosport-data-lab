@@ -17,25 +17,29 @@ type LogEvent struct {
 }
 
 type LogPayload struct {
-	LogID               string `json:"log_id"`
-	ContestID           string `json:"contest_id"`
-	StationCall         string `json:"station_call"`
-	StationPrefix       string `json:"station_prefix"`
-	StationContinent    string `json:"station_continent"`
-	StationCountry      string `json:"station_country"`
-	CQZone              int    `json:"cq_zone"`
-	ITUZone             int    `json:"itu_zone"`
-	CategoryOperator    string `json:"category_operator"`
-	CategoryAssisted    string `json:"category_assisted"`
-	CategoryBand        string `json:"category_band"`
-	CategoryPower       string `json:"category_power"`
-	CategoryMode        string `json:"category_mode"`
-	CategoryTransmitter string `json:"category_transmitter"`
-	ClaimedScore        int64  `json:"claimed_score"`
-	QSOCount            int    `json:"qso_count"`
-	ScopeRegion         string `json:"scope_region"`
-	SourceFile          string `json:"source_file"`
-	LoadedAt            string `json:"loaded_at"`
+	LogID                string  `json:"log_id"`
+	ContestID            string  `json:"contest_id"`
+	StationCall          string  `json:"station_call"`
+	StationPrefix        string  `json:"station_prefix"`
+	StationContinent     string  `json:"station_continent"`
+	StationCountry       string  `json:"station_country"`
+	CQZone               int     `json:"cq_zone"`
+	ITUZone              int     `json:"itu_zone"`
+	StationLatitude      float64 `json:"station_latitude"`
+	StationLongitude     float64 `json:"station_longitude"`
+	StationGeoSource     string  `json:"station_geo_source"`
+	StationGeoConfidence string  `json:"station_geo_confidence"`
+	CategoryOperator     string  `json:"category_operator"`
+	CategoryAssisted     string  `json:"category_assisted"`
+	CategoryBand         string  `json:"category_band"`
+	CategoryPower        string  `json:"category_power"`
+	CategoryMode         string  `json:"category_mode"`
+	CategoryTransmitter  string  `json:"category_transmitter"`
+	ClaimedScore         int64   `json:"claimed_score"`
+	QSOCount             int     `json:"qso_count"`
+	ScopeRegion          string  `json:"scope_region"`
+	SourceFile           string  `json:"source_file"`
+	LoadedAt             string  `json:"loaded_at"`
 }
 
 type QSOEvent struct {
@@ -71,25 +75,29 @@ func NewLogEvent(log Log) LogEvent {
 	return LogEvent{
 		Type: LogEventType,
 		Data: LogPayload{
-			LogID:               log.LogID,
-			ContestID:           log.ContestID,
-			StationCall:         log.StationCall,
-			StationPrefix:       log.StationPrefix,
-			StationContinent:    log.StationContinent,
-			StationCountry:      log.StationCountry,
-			CQZone:              log.CQZone,
-			ITUZone:             log.ITUZone,
-			CategoryOperator:    log.CategoryOperator,
-			CategoryAssisted:    log.CategoryAssisted,
-			CategoryBand:        log.CategoryBand,
-			CategoryPower:       log.CategoryPower,
-			CategoryMode:        log.CategoryMode,
-			CategoryTransmitter: log.CategoryTransmitter,
-			ClaimedScore:        log.ClaimedScore,
-			QSOCount:            log.QSOCount,
-			ScopeRegion:         log.ScopeRegion,
-			SourceFile:          log.SourceFile,
-			LoadedAt:            formatTime(log.LoadedAt),
+			LogID:                log.LogID,
+			ContestID:            log.ContestID,
+			StationCall:          log.StationCall,
+			StationPrefix:        log.StationPrefix,
+			StationContinent:     log.StationContinent,
+			StationCountry:       log.StationCountry,
+			CQZone:               log.CQZone,
+			ITUZone:              log.ITUZone,
+			StationLatitude:      log.StationLatitude,
+			StationLongitude:     log.StationLongitude,
+			StationGeoSource:     log.StationGeoSource,
+			StationGeoConfidence: log.StationGeoConfidence,
+			CategoryOperator:     log.CategoryOperator,
+			CategoryAssisted:     log.CategoryAssisted,
+			CategoryBand:         log.CategoryBand,
+			CategoryPower:        log.CategoryPower,
+			CategoryMode:         log.CategoryMode,
+			CategoryTransmitter:  log.CategoryTransmitter,
+			ClaimedScore:         log.ClaimedScore,
+			QSOCount:             log.QSOCount,
+			ScopeRegion:          log.ScopeRegion,
+			SourceFile:           log.SourceFile,
+			LoadedAt:             formatTime(log.LoadedAt),
 		},
 	}
 }

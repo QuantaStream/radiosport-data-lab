@@ -33,7 +33,7 @@ objects:
   table_name: contest_logs
   object_type: TABLE
   creation_date: 2026-08-28T00:00:00Z
-  modification_date: 2026-08-28T00:00:00Z
+  modification_date: 2026-08-29T00:00:00Z
 - schema_name: quanta
   table_name: contest_qsos
   object_type: TABLE
@@ -44,3 +44,23 @@ objects:
   object_type: TABLE
   creation_date: 2026-08-28T00:00:00Z
   modification_date: 2026-08-28T00:00:00Z
+- schema_name: quanta
+  table_name: rbn_spotter_nodes
+  object_type: TABLE
+  creation_date: 2026-08-29T00:00:00Z
+  modification_date: 2026-08-29T00:00:00Z
+- schema_name: quanta
+  table_name: spotter_profile_snapshots
+  object_type: TABLE
+  creation_date: 2026-08-29T00:00:00Z
+  modification_date: 2026-08-29T00:00:00Z
+- schema_name: quanta
+  table_name: spotter_profiles
+  object_type: TABLE
+  creation_date: 2026-08-29T00:00:00Z
+  modification_date: 2026-08-29T00:00:00Z
+- schema_name: quanta
+  table_name: station_activity_5m_summaries
+  object_type: TABLE
+  creation_date: 2026-08-29T00:00:00Z
+  modification_date: 2026-08-29T00:00:00Z

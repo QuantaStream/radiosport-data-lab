@@ -48,51 +48,73 @@ attributes:
   mappingStrategy: IntBSI
   type: Integer
   sourceOrdinal: 8
+- fieldName: station_latitude
+  sourceName: /data/station_latitude
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 4
+  sourceOrdinal: 9
+- fieldName: station_longitude
+  sourceName: /data/station_longitude
+  mappingStrategy: FloatScaleBSI
+  type: Float
+  scale: 4
+  sourceOrdinal: 10
+- fieldName: station_geo_source
+  sourceName: /data/station_geo_source
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 11
+- fieldName: station_geo_confidence
+  sourceName: /data/station_geo_confidence
+  mappingStrategy: StringEnum
+  type: String
+  sourceOrdinal: 12
 - fieldName: category_operator
   sourceName: /data/category_operator
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 9
+  sourceOrdinal: 13
 - fieldName: category_assisted
   sourceName: /data/category_assisted
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 10
+  sourceOrdinal: 14
 - fieldName: category_band
   sourceName: /data/category_band
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 11
+  sourceOrdinal: 15
 - fieldName: category_power
   sourceName: /data/category_power
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 12
+  sourceOrdinal: 16
 - fieldName: category_mode
   sourceName: /data/category_mode
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 13
+  sourceOrdinal: 17
 - fieldName: category_transmitter
   sourceName: /data/category_transmitter
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 14
+  sourceOrdinal: 18
 - fieldName: claimed_score
   sourceName: /data/claimed_score
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 15
+  sourceOrdinal: 19
 - fieldName: qso_count
   sourceName: /data/qso_count
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 16
+  sourceOrdinal: 20
 - fieldName: scope_region
   sourceName: /data/scope_region
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 17
+  sourceOrdinal: 21
 - fieldName: source_file
   sourceName: /data/source_file
   mappingStrategy: StringLexBSI
@@ -100,11 +122,11 @@ attributes:
     length: "16"
   type: String
   maxLen: 160
-  sourceOrdinal: 18
+  sourceOrdinal: 22
 - fieldName: loaded_at
   sourceName: /data/loaded_at
   mappingStrategy: TimestampBSI
   configuration:
     granularity: "second"
   type: DateTime
-  sourceOrdinal: 19
+  sourceOrdinal: 23

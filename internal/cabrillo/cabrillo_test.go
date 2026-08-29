@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/QuantaStream/radiosport-data-lab/internal/callsign"
+	"github.com/QuantaStream/radiosport-data-lab/internal/geo"
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
 )
 
@@ -21,6 +23,12 @@ CLAIMED-SCORE: 4476480
 QSO:    7058 CW 2025-11-29 0002 TI8X             599 7     K0DU             599  04
 QSO:   21010 CW 2025-11-30 2346 TI8X             599 7     JA3YBK           599  25
 END-OF-LOG:
+`
+
+const sampleCTY = `Costa Rica:                 07:  11:  NA:   10.00:    84.00:     6.0:  TI:
+    TI;
+Japan:                      25:  45:  AS:   36.40:  -138.38:    -9.0:  JA:
+    JA;
 `
 
 func TestParseCabrilloCQWWLog(t *testing.T) {
@@ -71,6 +79,36 @@ func TestParseCabrilloCQWWLog(t *testing.T) {
 	}
 	if qsos[0].QSOID == 0 || qsos[0].QSOID == qsos[1].QSOID {
 		t.Fatalf("qso ids = %d/%d", qsos[0].QSOID, qsos[1].QSOID)
+	}
+}
+
+func TestParseCabrilloAddsStationGeoFromCTY(t *testing.T) {
+	db, err := callsign.Load(strings.NewReader(sampleCTY))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	log, qsos, _, err := Parse(strings.NewReader(sampleLog), ParseOptions{
+		SourceFile: "ti8x.log",
+		CallsignDB: db,
+	})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if log.StationCountry != "Costa Rica" || log.StationPrefix != "TI" || log.StationContinent != "NA" {
+		t.Fatalf("station enrichment = %+v", log)
+	}
+	if log.StationLatitude != 10 || log.StationLongitude != -84 {
+		t.Fatalf("station location = %v/%v, want 10/-84", log.StationLatitude, log.StationLongitude)
+	}
+	if log.StationGeoSource != geo.SourceCTY || log.StationGeoConfidence != geo.ConfidenceCountryCentroid {
+		t.Fatalf("station geo provenance = %s/%s", log.StationGeoSource, log.StationGeoConfidence)
+	}
+	if qsos[1].WorkedPrefix != "JA" || qsos[1].WorkedContinent != "AS" {
+		t.Fatalf("worked call enrichment = %+v", qsos[1])
+	}
+	event := NewLogEvent(log)
+	if event.Data.StationLatitude != 10 || event.Data.StationLongitude != -84 {
+		t.Fatalf("log event geo = %+v", event.Data)
 	}
 }
 

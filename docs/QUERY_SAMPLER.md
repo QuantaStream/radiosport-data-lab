@@ -22,6 +22,7 @@ select count(*) as match_count from contest_spot_matches;
 select count(*) as swpc_daily_count from swpc_daily_indices;
 select count(*) as swpc_k_count from swpc_k_indices_3h;
 select count(*) as spotter_profile_count from spotter_profiles;
+select count(*) as station_activity_count from station_activity_5m_summaries;
 ```
 
 ```sql
@@ -299,6 +300,10 @@ Top spotters in the current calibration window:
 select
   spotter_call,
   spotter_continent,
+  country_name,
+  latitude,
+  longitude,
+  geo_confidence,
   total_spots,
   active_hours,
   distinct_dx_calls,
@@ -310,6 +315,23 @@ select
 from spotter_profile_base
 order by total_spots desc
 limit 25;
+```
+
+Spotter map starting point:
+
+```sql
+select
+  spotter_call,
+  country_name,
+  latitude,
+  longitude,
+  total_spots,
+  avg_signal_db,
+  spotter_weight
+from spotter_profile_base
+where geo_confidence = 'COUNTRY_CENTROID'
+order by total_spots desc
+limit 100;
 ```
 
 Spotter calibration shape by continent:
@@ -330,6 +352,47 @@ These rows are calibration metadata. The first weighting policy is deliberately
 simple: high-volume spotters get `spotter_weight = 1 / sqrt(total_spots)`, while
 `normalization_offset_db` starts as the spotter's average reported signal.
 
+## Station Activity
+
+Best five-minute activity buckets for one station:
+
+```sql
+select
+  dx_call,
+  band,
+  bucket_hour,
+  spotter_continent,
+  spot_count,
+  distinct_spotters,
+  avg_signal_db,
+  reach_score
+from station_activity_5m_base
+where dx_call = 'TI8X'
+order by reach_score desc
+limit 25;
+```
+
+Hour-by-band activity shape for Tableau:
+
+```sql
+select
+  bucket_hour,
+  band,
+  spotter_continent,
+  sum(spot_count) as spots,
+  avg(avg_signal_db) as avg_signal_db,
+  avg(reach_score) as avg_reach_score
+from station_activity_5m_base
+where dx_call = 'TI8X'
+group by bucket_hour, band, spotter_continent
+order by bucket_hour, band, spots desc
+limit 200;
+```
+
+These rows are station-time summaries, not raw spot rows. They are meant to make
+missed-opening and cohort-comparison queries practical without asking Tableau to
+generate interval joins or large high-cardinality groupings.
+
 ## Tableau-Friendly Starts
 
 Use these views as first Tableau logical tables:
@@ -341,6 +404,7 @@ Use these views as first Tableau logical tables:
 | `contest_qso_propagation_base` | QSO volume by band, worked continent, SFI, Kp |
 | `rbn_spot_propagation_base` | RBN spot volume by band, prefix, SFI, Kp |
 | `spotter_profile_base` | spotter volume, baseline signal, and calibration quality |
+| `station_activity_5m_base` | station audibility by five-minute bucket, band, and receiving continent |
 
 Calculated fields that are already exposed as columns in the views should be
 used directly in Tableau when possible. For example, prefer `qso_hour` over a

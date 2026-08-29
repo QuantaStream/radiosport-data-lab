@@ -22,6 +22,8 @@ max_matches="${CONTEST_MAX_MATCHES_PER_QSO:-0}"
 parent_flush_wait="${RBN_PARENT_FLUSH_WAIT:-2s}"
 loader_wait_seconds="${RBN_LOADER_WAIT_SECONDS:-900}"
 profile_build="${RBN_PROFILE_BUILD:-1}"
+station_activity_build="${RBN_STATION_ACTIVITY_BUILD:-1}"
+station_activity_dx_call="${RBN_STATION_ACTIVITY_DX_CALL:-$station}"
 out_dir="${RBN_WORKFLOW_DIR:-/tmp/radiosport-ti8x-workflow-$(date -u +%Y%m%dT%H%M%SZ)}"
 reset=0
 install_views=1
@@ -54,6 +56,8 @@ Environment overrides:
   CONTEST_STATION=$station
   CONTEST_LOG_URL=$contest_log
   RBN_CACHE_DIR=$cache_dir
+  RBN_STATION_ACTIVITY_BUILD=$station_activity_build
+  RBN_STATION_ACTIVITY_DX_CALL=$station_activity_dx_call
   RBN_PROFILE_BUILD=$profile_build
 USAGE
 }
@@ -193,6 +197,7 @@ log "loader_url=$loader_url"
 log "mysql=${mysql_host}:${mysql_port}/${mysql_db} user=${mysql_user}"
 log "station=$station contest_log=$contest_log"
 log "cache_dir=$cache_dir"
+log "station_activity_build=$station_activity_build station_activity_dx_call=$station_activity_dx_call"
 printf '%s\n' "${archives[@]}" > "$out_dir/archives.txt"
 printf '%s\n' "${cache_days[@]}" > "$out_dir/cache-days.txt"
 
@@ -204,14 +209,14 @@ printf '\n' >> "$out_dir/loader-health.json"
 capture_loader_stats "before"
 
 if [ "$create_schema" = "1" ]; then
-  for table in swpc_daily_indices swpc_k_indices_3h activity_5m_buckets spots_flat contest_logs contest_qsos contest_spot_matches rbn_spotter_nodes spotter_profile_snapshots spotter_profiles; do
+  for table in swpc_daily_indices swpc_k_indices_3h activity_5m_buckets spots_flat contest_logs contest_qsos contest_spot_matches rbn_spotter_nodes spotter_profile_snapshots spotter_profiles station_activity_5m_summaries; do
     log "create table ${table}"
     admin create --port="$mysql_port" --schema-dir="$app_repo/configuration" "$table" 2>&1 | tee -a "$out_dir/schema-create.log"
   done
 fi
 
 if [ "$reset" = "1" ]; then
-  for table in spotter_profile_snapshots spotter_profiles rbn_spotter_nodes contest_spot_matches contest_qsos spots_flat swpc_k_indices_3h contest_logs activity_5m_buckets swpc_daily_indices; do
+  for table in station_activity_5m_summaries spotter_profile_snapshots spotter_profiles rbn_spotter_nodes contest_spot_matches contest_qsos spots_flat swpc_k_indices_3h contest_logs activity_5m_buckets swpc_daily_indices; do
     log "truncate table ${table}"
     admin truncate --port="$mysql_port" "$table" 2>&1 | tee -a "$out_dir/truncate.log"
   done
@@ -230,9 +235,20 @@ capture_loader_stats "after-spots"
 run_step rbn-cache-build \
   bash -lc "cd '$app_repo' && go run ./cmd/rbn-cache-build -cache-dir '$cache_dir' -dx-call '$station' -dense-spot-ids ${archives[*]}"
 
+if [ "$station_activity_build" = "1" ]; then
+  station_activity_dx_arg=""
+  if [ -n "$station_activity_dx_call" ]; then
+    station_activity_dx_arg="-dx-call '$station_activity_dx_call'"
+  fi
+  run_step station-activity-build \
+    bash -lc "cd '$app_repo' && go run ./cmd/station-activity-build -mysql-dsn '${mysql_user}@tcp(${mysql_host}:${mysql_port})/${mysql_db}?parseTime=true' -target '$loader_url/ingest/json' -from '$from_day' -to '$to_day 23:59:59' -source-table spots_flat -batch-size '$batch_size' $station_activity_dx_arg"
+  wait_loader_idle
+  capture_loader_stats "after-station-activity"
+fi
+
 if [ "$profile_build" = "1" ]; then
   run_step spotter-profile-build \
-    bash -lc "cd '$app_repo' && go run ./cmd/spotter-profile-build -mysql-dsn '${mysql_user}@tcp(${mysql_host}:${mysql_port})/${mysql_db}?parseTime=true' -target '$loader_url/ingest/json' -from '$from_day' -to '$to_day 23:59:59' -profile-kind contest -source-table spots_flat -batch-size '$batch_size' -parent-flush-wait '$parent_flush_wait'"
+    bash -lc "cd '$app_repo' && go run ./cmd/spotter-profile-build -mysql-dsn '${mysql_user}@tcp(${mysql_host}:${mysql_port})/${mysql_db}?parseTime=true' -target '$loader_url/ingest/json' -from '$from_day' -to '$to_day 23:59:59' -profile-kind contest -source-table spots_flat -batch-size '$batch_size' -parent-flush-wait '$parent_flush_wait' ${cty_args[*]}"
   wait_loader_idle
   capture_loader_stats "after-spotter-profiles"
 fi
@@ -255,6 +271,7 @@ if [ "$install_views" = "1" ]; then
   run_mysql_file "$app_repo/sql/views/contest_spot_match_base.sql"
   run_mysql_file "$app_repo/sql/views/contest_best_spot_match_base.sql"
   run_mysql_file "$app_repo/sql/views/spotter_profile_base.sql"
+  run_mysql_file "$app_repo/sql/views/station_activity_5m_base.sql"
 fi
 
 log "verification counts"
@@ -267,6 +284,7 @@ select count(*) as contest_log_count from contest_logs;
 select count(*) as contest_qso_count, min(qso_at), max(qso_at) from contest_qsos;
 select count(*) as contest_spot_match_count from contest_spot_matches;
 select count(*) as spotter_profile_count from spotter_profiles;
+select count(*) as station_activity_5m_count from station_activity_5m_summaries;
 " | tee "$out_dir/counts.txt"
 
 log "verification match summary"
@@ -291,11 +309,20 @@ limit 20;
 
 log "verification spotter profile summary"
 mysql_exec -e "
-select spotter_call, spotter_continent, total_spots, active_hours, avg_signal_db, spotter_weight, profile_quality
+select spotter_call, spotter_continent, country_name, latitude, longitude, geo_confidence, total_spots, active_hours, avg_signal_db, spotter_weight, profile_quality
 from spotter_profile_base
 order by total_spots desc
 limit 20;
 " | tee "$out_dir/spotter-profile-summary.txt"
+
+log "verification station activity summary"
+mysql_exec -e "
+select dx_call, band, spotter_continent, spot_count, distinct_spotters, avg_signal_db, reach_score
+from station_activity_5m_base
+where dx_call = '$station'
+order by reach_score desc
+limit 20;
+" | tee "$out_dir/station-activity-summary.txt"
 
 log "verification propagation summary"
 mysql_exec -e "

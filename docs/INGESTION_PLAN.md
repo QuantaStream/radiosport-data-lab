@@ -170,7 +170,10 @@ This path should be the sustained-throughput baseline.
 
 Start `qstream-loader` with every target table in its allowlist. A full contest
 reload normally includes `activity_5m_buckets`, `spots_flat`, `contest_logs`,
-`contest_qsos`, `swpc_daily_indices`, and `swpc_k_indices_3h`.
+`contest_qsos`, `contest_spot_matches`, `rbn_spotter_nodes`,
+`spotter_profile_snapshots`, `spotter_profiles`,
+`station_activity_5m_summaries`, `swpc_daily_indices`, and
+`swpc_k_indices_3h`.
 
 Example direct loader run:
 
@@ -483,6 +486,7 @@ The useful first joins are:
 - `contest_qsos.qso_3h_bucket_key -> swpc_k_indices_3h.bucket_key`
 - `contest_qsos.activity_5m_ref -> activity_5m_buckets.activity_5m_id`
 - `spots_flat.activity_5m_ref -> activity_5m_buckets.activity_5m_id`
+- `station_activity_5m_summaries.activity_5m_ref -> activity_5m_buckets.activity_5m_id`
 - RBN spots to SWPC through `spot_day_ref` and `spot_3h_bucket_ref`
 - RBN spots to Cabrillo QSOs by shared activity bucket, or by exact bounded
   time/frequency proximity through scored `contest_spot_matches`

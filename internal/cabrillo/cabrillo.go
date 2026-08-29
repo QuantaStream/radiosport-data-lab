@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/QuantaStream/radiosport-data-lab/internal/callsign"
+	"github.com/QuantaStream/radiosport-data-lab/internal/geo"
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
 )
 
@@ -33,25 +34,29 @@ type ParseStats struct {
 }
 
 type Log struct {
-	LogID               string
-	ContestID           string
-	StationCall         string
-	StationPrefix       string
-	StationContinent    string
-	StationCountry      string
-	CQZone              int
-	ITUZone             int
-	CategoryOperator    string
-	CategoryAssisted    string
-	CategoryBand        string
-	CategoryPower       string
-	CategoryMode        string
-	CategoryTransmitter string
-	ClaimedScore        int64
-	QSOCount            int
-	ScopeRegion         string
-	SourceFile          string
-	LoadedAt            time.Time
+	LogID                string
+	ContestID            string
+	StationCall          string
+	StationPrefix        string
+	StationContinent     string
+	StationCountry       string
+	CQZone               int
+	ITUZone              int
+	StationLatitude      float64
+	StationLongitude     float64
+	StationGeoSource     string
+	StationGeoConfidence string
+	CategoryOperator     string
+	CategoryAssisted     string
+	CategoryBand         string
+	CategoryPower        string
+	CategoryMode         string
+	CategoryTransmitter  string
+	ClaimedScore         int64
+	QSOCount             int
+	ScopeRegion          string
+	SourceFile           string
+	LoadedAt             time.Time
 }
 
 type QSO struct {
@@ -79,11 +84,15 @@ type QSO struct {
 }
 
 type callInfo struct {
-	Prefix    string
-	Continent string
-	Country   string
-	CQZone    int
-	ITUZone   int
+	Prefix        string
+	Continent     string
+	Country       string
+	CQZone        int
+	ITUZone       int
+	Latitude      float64
+	Longitude     float64
+	GeoSource     string
+	GeoConfidence string
 }
 
 func Parse(r io.Reader, options ParseOptions) (Log, []QSO, ParseStats, error) {
@@ -151,25 +160,29 @@ func Parse(r io.Reader, options ParseOptions) (Log, []QSO, ParseStats, error) {
 	logID := stableLogID(contestID, stationCall)
 
 	log := Log{
-		LogID:               logID,
-		ContestID:           contestID,
-		StationCall:         stationCall,
-		StationPrefix:       station.Prefix,
-		StationContinent:    station.Continent,
-		StationCountry:      station.Country,
-		CQZone:              station.CQZone,
-		ITUZone:             station.ITUZone,
-		CategoryOperator:    normalizeCategory(headers["CATEGORY-OPERATOR"]),
-		CategoryAssisted:    normalizeCategory(headers["CATEGORY-ASSISTED"]),
-		CategoryBand:        normalizeCategory(headers["CATEGORY-BAND"]),
-		CategoryPower:       normalizeCategory(headers["CATEGORY-POWER"]),
-		CategoryMode:        normalizeCategory(headers["CATEGORY-MODE"]),
-		CategoryTransmitter: normalizeCategory(headers["CATEGORY-TRANSMITTER"]),
-		ClaimedScore:        parseInt64Default(headers["CLAIMED-SCORE"]),
-		QSOCount:            len(rawQSOs),
-		ScopeRegion:         normalizeCategory(defaultString(options.ScopeRegion, "tier1")),
-		SourceFile:          sourceFile,
-		LoadedAt:            loadedAt,
+		LogID:                logID,
+		ContestID:            contestID,
+		StationCall:          stationCall,
+		StationPrefix:        station.Prefix,
+		StationContinent:     station.Continent,
+		StationCountry:       station.Country,
+		CQZone:               station.CQZone,
+		ITUZone:              station.ITUZone,
+		StationLatitude:      station.Latitude,
+		StationLongitude:     station.Longitude,
+		StationGeoSource:     station.GeoSource,
+		StationGeoConfidence: station.GeoConfidence,
+		CategoryOperator:     normalizeCategory(headers["CATEGORY-OPERATOR"]),
+		CategoryAssisted:     normalizeCategory(headers["CATEGORY-ASSISTED"]),
+		CategoryBand:         normalizeCategory(headers["CATEGORY-BAND"]),
+		CategoryPower:        normalizeCategory(headers["CATEGORY-POWER"]),
+		CategoryMode:         normalizeCategory(headers["CATEGORY-MODE"]),
+		CategoryTransmitter:  normalizeCategory(headers["CATEGORY-TRANSMITTER"]),
+		ClaimedScore:         parseInt64Default(headers["CLAIMED-SCORE"]),
+		QSOCount:             len(rawQSOs),
+		ScopeRegion:          normalizeCategory(defaultString(options.ScopeRegion, "tier1")),
+		SourceFile:           sourceFile,
+		LoadedAt:             loadedAt,
 	}
 
 	qsos := make([]QSO, 0, len(rawQSOs))
@@ -254,7 +267,14 @@ func parseQSOLine(line string, lineNumber int) (rawQSO, error) {
 }
 
 func enrichCall(db *callsign.Database, call string) callInfo {
-	info := callInfo{Prefix: UnknownValue, Continent: UnknownValue, Country: UnknownValue}
+	unknownLocation := geo.Unknown()
+	info := callInfo{
+		Prefix:        UnknownValue,
+		Continent:     UnknownValue,
+		Country:       UnknownValue,
+		GeoSource:     unknownLocation.Source,
+		GeoConfidence: unknownLocation.Confidence,
+	}
 	if db == nil {
 		return info
 	}
@@ -267,6 +287,11 @@ func enrichCall(db *callsign.Database, call string) callInfo {
 	info.Country = defaultString(station.Country, UnknownValue)
 	info.CQZone = station.CQZone
 	info.ITUZone = station.ITUZone
+	location := geo.FromCTYCountry(station.Latitude, station.Longitude)
+	info.Latitude = location.Latitude
+	info.Longitude = location.Longitude
+	info.GeoSource = location.Source
+	info.GeoConfidence = location.Confidence
 	return info
 }
 

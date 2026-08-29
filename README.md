@@ -25,7 +25,10 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/contest-spot-match-load` materializes QSO-to-RBN spot matches from a
   Cabrillo log and matching RBN archive files.
 - `cmd/spotter-profile-build` computes current RBN spotter calibration profiles
-  from loaded spot data and emits loader events.
+  from loaded spot data and emits loader events, including CTY-derived country
+  centroid geo fields when `cty.dat` is available.
+- `cmd/station-activity-build` materializes five-minute station activity
+  summaries for missed-opening and cohort analysis.
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
 - `scripts/run-ti8x-contest-workflow.sh` runs the focused TI8X contest
   load/cache/match/view workflow against a running QS server and loader.
@@ -41,6 +44,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
   Tier 1 Cabrillo contest-log expansion.
 - `docs/SPOTTER_PROFILES_DESIGN.md` sketches spotter calibration, weighted SNR,
   and reach-scoring tables/views.
+- `docs/MISSED_OPENINGS_DESIGN.md` sketches station activity summaries and
+  missed-opening analysis.
 - `docs/RUNNING_LAB.md` is the local restart, health-check, and workflow
   runbook.
 - `docs/QUERY_SAMPLER.md` contains copy/paste SQL for Workbench, Tableau, and
@@ -74,7 +79,8 @@ go run ./cmd/rbn-update-cty
 go run ./cmd/swpc-load -from 2026-08-21 -to 2026-08-21 > /tmp/swpc-20260821.jsonl
 go run ./cmd/cabrillo-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log > /tmp/ti8x-contest.jsonl
 go run ./cmd/contest-spot-match-load -target "" -rbn-cache /tmp/rbn-cache-ti8x https://cqww.com/publiclogs/2025cw/ti8x.log 2025-11-29 2025-11-30 > /tmp/ti8x-matches.jsonl
-go run ./cmd/spotter-profile-build -target "" -from 2025-11-29 -to 2025-12-01 > /tmp/spotter-profiles.jsonl
+go run ./cmd/spotter-profile-build -target "" -from 2025-11-29 -to 2025-12-01 -cty-dat data/cty/cty.dat > /tmp/spotter-profiles.jsonl
+go run ./cmd/station-activity-build -target "" -from 2025-11-29 -to 2025-12-01 -dx-call TI8X > /tmp/station-activity.jsonl
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-telnet-sql-ingest -qrz-enrich
 ```
@@ -124,9 +130,10 @@ files.
 SWPC backfills use the same loader endpoint. Start `qstream-loader` with
 `activity_5m_buckets`, `spots_flat`, `contest_logs`, `contest_qsos`,
 `contest_spot_matches`, `rbn_spotter_nodes`, `spotter_profile_snapshots`,
-`spotter_profiles`, `swpc_daily_indices`, and `swpc_k_indices_3h` in its
-`-tables` allowlist when running the full contest reload. Historical annual
-SWPC files are cached under `data/swpc` when `-year` is used:
+`spotter_profiles`, `station_activity_5m_summaries`, `swpc_daily_indices`, and
+`swpc_k_indices_3h` in its `-tables` allowlist when running the full contest
+reload. Historical annual SWPC files are cached under `data/swpc` when `-year`
+is used:
 
 ```bash
 go run ./cmd/swpc-load \
@@ -172,6 +179,8 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_best_spot_match_base.sql
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/spotter_profile_base.sql
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/station_activity_5m_base.sql
 ```
 
 The match views expose Tableau-friendly UTC date parts such as `qso_hour`,
@@ -235,7 +244,8 @@ The script expects QuantaStream and `qstream-loader` to already be running with
 the RadioSport schema directory. It creates the required tables, truncates the
 workflow tables when `--reset` is passed, loads SWPC context, loads focused
 `spots_flat` rows, builds the parsed RBN cache, materializes exact matches,
-installs the views, and writes logs plus verification output under `/tmp`.
+builds spotter profiles and station activity summaries, installs the views, and
+writes logs plus verification output under `/tmp`.
 
 Manual form:
 
