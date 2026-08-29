@@ -202,12 +202,12 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
 
 The workflow expects QS and `qstream-loader` to already be running. It creates
 tables if needed, truncates child-first when `--reset` is supplied, reloads SWPC
-context, loads focused RBN rows for TI8X, loads the public Cabrillo log,
-materializes exact QSO-to-spot matches, builds current spotter calibration
-profiles and station activity summaries, and refreshes views. Set
-`RBN_PROFILE_BUILD=0` to skip profile generation during quick parser-only
-iterations. Set `RBN_STATION_ACTIVITY_BUILD=0` to skip station activity
-summaries.
+context, loads focused RBN rows for one DX call or a small competitor pack,
+loads public Cabrillo logs, materializes exact QSO-to-spot matches for each log,
+builds current spotter calibration profiles and station activity summaries, and
+refreshes views. Set `RBN_PROFILE_BUILD=0` to skip profile generation during
+quick parser-only iterations. Set `RBN_STATION_ACTIVITY_BUILD=0` to skip station
+activity summaries.
 
 ```bash
 cd ~/projects/radiosport-data-lab
@@ -225,7 +225,7 @@ Default inputs:
 | CTY file | `data/cty/cty.dat` |
 | Loader URL | `http://127.0.0.1:8088` |
 | Spotter profile build | enabled; set `RBN_PROFILE_BUILD=0` to skip |
-| Station activity build | enabled for `TI8X`; set `RBN_STATION_ACTIVITY_BUILD=0` to skip |
+| Station activity build | enabled for the focused station list; set `RBN_STATION_ACTIVITY_BUILD=0` to skip |
 
 Override examples:
 
@@ -235,6 +235,23 @@ RBN_DAY_WORKERS=2 \
 RBN_SPOT_WORKERS=4 \
 ./scripts/run-ti8x-contest-workflow.sh --reset
 ```
+
+Small competitor-pack reload:
+
+```bash
+CONTEST_STATIONS=TI8X,V47T,8P5A \
+CONTEST_LOG_URLS=https://cqww.com/publiclogs/2025cw/ti8x.log,https://cqww.com/publiclogs/2025cw/v47t.log,https://cqww.com/publiclogs/2025cw/8p5a.log \
+RBN_DAY_WORKERS=2 \
+RBN_SPOT_WORKERS=4 \
+./scripts/run-ti8x-contest-workflow.sh --reset
+```
+
+Use the same DX-call list for RBN archive loading and cache building. The
+workflow handles that automatically through `CONTEST_STATIONS`, then loads and
+matches each Cabrillo log listed in `CONTEST_LOG_URLS`. The filter is only on
+the spotted DX call; all RBN spotter/receiver stations remain in the loaded
+data, including important Caribbean spotters such as `TI7W`. Add `PJ4K` or
+`ZF1A` when a larger Caribbean comparison pack is useful.
 
 ## Tableau Notes
 

@@ -31,7 +31,8 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
   summaries for missed-opening and cohort analysis.
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
 - `scripts/run-ti8x-contest-workflow.sh` runs the focused TI8X contest
-  load/cache/match/view workflow against a running QS server and loader.
+  load/cache/match/view workflow, with optional competitor packs, against a
+  running QS server and loader.
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
@@ -243,16 +244,32 @@ Materialize exact QSO-to-spot matches for the focused TI8X reload:
 The script expects QuantaStream and `qstream-loader` to already be running with
 the RadioSport schema directory. It creates the required tables, truncates the
 workflow tables when `--reset` is passed, loads SWPC context, loads focused
-`spots_flat` rows, builds the parsed RBN cache, materializes exact matches,
-builds spotter profiles and station activity summaries, installs the views, and
-writes logs plus verification output under `/tmp`.
+`spots_flat` rows, builds the parsed RBN cache, loads one or more Cabrillo logs,
+materializes exact matches for each log, builds spotter profiles and station
+activity summaries, installs the views, and writes logs plus verification output
+under `/tmp`.
+
+Small competitor-pack reload:
+
+```bash
+CONTEST_STATIONS=TI8X,V47T,8P5A \
+CONTEST_LOG_URLS=https://cqww.com/publiclogs/2025cw/ti8x.log,https://cqww.com/publiclogs/2025cw/v47t.log,https://cqww.com/publiclogs/2025cw/8p5a.log \
+./scripts/run-ti8x-contest-workflow.sh --reset
+```
+
+The workflow uses the same callsign watchlist for the filtered RBN spot load and
+the parsed RBN cache so dense archive spot IDs remain aligned. This is a DX-call
+filter only: all RBN spotter/receiver stations that heard those DX calls remain
+in `spots_flat`, including important Caribbean spotters such as `TI7W`. Larger
+Caribbean comparison packs can add public Cabrillo logs such as `PJ4K` and
+`ZF1A`.
 
 Manual form:
 
 ```bash
 go run ./cmd/rbn-cache-build \
   -cache-dir /tmp/rbn-cache-ti8x \
-  -dx-call TI8X \
+  -dx-call TI8X,V47T,8P5A \
   -dense-spot-ids \
   /tmp/rbn-data/20251129.zip \
   /tmp/rbn-data/20251130.zip

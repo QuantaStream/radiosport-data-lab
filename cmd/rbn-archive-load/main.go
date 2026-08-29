@@ -7,12 +7,12 @@ import (
 	"log"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/QuantaStream/radiosport-data-lab/internal/qrz"
 	"github.com/QuantaStream/radiosport-data-lab/internal/rbn"
+	"github.com/QuantaStream/radiosport-data-lab/internal/rbncache"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 	qrzParents := flag.Bool("qrz-parents", true, "emit pending qrz_callsign parent events before spots")
 	activityParents := flag.Bool("activity-parents", true, "emit activity_5m_bucket parent events before spots")
 	denseSpotIDs := flag.Bool("dense-spot-ids", false, "assign day-local dense spot ids for storage-friendly archive backfills")
-	dxCallFilter := flag.String("dx-call", "", "optional DX callsign filter, for example TI8X")
+	dxCallFilter := flag.String("dx-call", "", "optional comma-separated DX callsign filter, for example TI8X,V47T,8P5A")
 	parentFlushWait := flag.Duration("parent-flush-wait", 2*time.Second, "wait after posting generated parent rows before posting child rows")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-request timeout")
 	flag.Usage = func() {
@@ -52,13 +52,13 @@ func main() {
 	if (*workers > 1 || *dayWorkers > 1) && *qrzParents {
 		log.Fatal("-workers or -day-workers greater than 1 requires -qrz-parents=false; relationship loads must preserve parent-before-spot order")
 	}
-	normalizedDXCall := strings.TrimSpace(*dxCallFilter)
-	if normalizedDXCall != "" {
-		var ok bool
-		normalizedDXCall, ok = rbn.NormalizeCallsign(normalizedDXCall)
-		if !ok {
-			log.Fatalf("invalid -dx-call %q", *dxCallFilter)
-		}
+	dxCalls, err := rbncache.NormalizeDXCalls([]string{*dxCallFilter})
+	if err != nil {
+		log.Fatal(err)
+	}
+	dxCallFilters := make(map[string]struct{}, len(dxCalls))
+	for _, call := range dxCalls {
+		dxCallFilters[call] = struct{}{}
 	}
 
 	sort.Strings(paths)
@@ -71,7 +71,7 @@ func main() {
 		qrzParents:      *qrzParents,
 		activityParents: *activityParents,
 		denseSpotIDs:    *denseSpotIDs,
-		dxCallFilter:    normalizedDXCall,
+		dxCallFilters:   dxCallFilters,
 		parentFlushWait: *parentFlushWait,
 		timeout:         *timeout,
 	}
@@ -230,8 +230,10 @@ func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoa
 		if config.limit > 0 && result.emitted >= config.limit {
 			return errLimitReached
 		}
-		if config.dxCallFilter != "" && spot.DXCall != config.dxCallFilter {
-			return nil
+		if len(config.dxCallFilters) > 0 {
+			if _, ok := config.dxCallFilters[spot.DXCall]; !ok {
+				return nil
+			}
 		}
 		if config.qrzParents {
 			if _, ok := seenQRZ[spot.DXCall]; !ok {
@@ -298,8 +300,10 @@ func collectActivityParentEvents(ctx context.Context, config loadConfig, path st
 		if config.limit > 0 && emitted >= config.limit {
 			return errLimitReached
 		}
-		if config.dxCallFilter != "" && spot.DXCall != config.dxCallFilter {
-			return nil
+		if len(config.dxCallFilters) > 0 {
+			if _, ok := config.dxCallFilters[spot.DXCall]; !ok {
+				return nil
+			}
 		}
 		bucket := rbn.Activity5MBucketFromSpot(spot)
 		buckets[bucket.Activity5MID] = bucket
@@ -364,7 +368,7 @@ type loadConfig struct {
 	qrzParents      bool
 	activityParents bool
 	denseSpotIDs    bool
-	dxCallFilter    string
+	dxCallFilters   map[string]struct{}
 	parentFlushWait time.Duration
 	timeout         time.Duration
 }
