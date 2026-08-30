@@ -71,11 +71,24 @@ Forecast-like analog pack for CQWW SSB 2023:
 
 - `8P5A`
 - `6Y1V`
+- `KP2M`
 
 Additional stations should be selected by category and geography, not only by
 claimed score. A good peer candidate is single-op, non-assisted, all-band,
 high-power, one transmitter, and located in the Caribbean/Central America
 neighborhood.
+
+Guy did not operate CQWW SSB in 2023, so this pack is a propagation and peer
+behavior analog rather than a direct self-versus-peer comparison. If a future
+analysis uses slashed callsigns, keep the exact value as the radio callsign in
+filters, Cabrillo parsing, and QS rows. Do not derive public-log URLs or local
+filenames from slash callsigns; use an explicit local path or an exact link
+copied from the public log index.
+
+Do not treat bare `N7ZG` RBN hits as Guy's Caribbean/Central America operating
+evidence for this analysis. Guy used bare `N7ZG` from Washington years earlier;
+current contest-planning comparisons should require the exact operating call,
+contest date, and operating location to match the analysis being performed.
 
 ## RBN Propagation Window Rules
 
@@ -101,7 +114,7 @@ Use `cmd/rbn-archive-scan` before loading archives:
 
 ```bash
 go run ./cmd/rbn-archive-scan \
-  -dx-calls 8P5A,6Y1V,V47T,TI8X,HP3/VE3DZ,KP2M,PJ2T,P40W \
+  -dx-calls '8P5A,6Y1V,V47T,HP3/VE3DZ,KP2M,PJ2T,P40W' \
   /tmp/rbn-data/2023*.zip
 ```
 
@@ -126,7 +139,7 @@ The next laptop analog pack should focus on:
 ```text
 RBN stations: 8P5A, KP2M
 RBN days: 2023-10-22, 2023-11-04, 2023-11-05
-Contest logs: 8P5A, 6Y1V, plus KP2M if the public 2023 phone log is available
+Contest logs: 8P5A, 6Y1V, KP2M
 ```
 
 This keeps the row count modest, preserves one known direct peer in the public
@@ -182,14 +195,7 @@ repeatable.
 When running the archive loader on a laptop, prefer the safe serialized path:
 
 ```bash
-RBN_DAY_WORKERS=1 \
-RBN_ARCHIVE_LOADER_IDLE_TIMEOUT=2m \
-RBN_ARCHIVE_COMMIT_AFTER_FILE=1 \
-./scripts/run-ti8x-contest-workflow.sh --reset \
-  /tmp/rbn-data/20231022.zip \
-  /tmp/rbn-data/20231024.zip \
-  /tmp/rbn-data/20231025.zip \
-  /tmp/rbn-data/20231114.zip
+./scripts/run-cqww-ssb-2026-planning.sh --reset
 ```
 
 ## Implementation Notes

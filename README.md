@@ -136,6 +136,8 @@ Queries, views, and workflows:
 - `scripts/run-ti8x-contest-workflow.sh` runs the focused TI8X contest
   load/cache/match/view workflow, with optional competitor packs, against a
   running QS server and loader.
+- `scripts/run-cqww-ssb-2026-planning.sh` wraps the contest workflow with a
+  small CQWW SSB 2026 analog-planning pack.
 - `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
   distributed flat-loader benchmark and captures a tarball of evidence.
 

@@ -167,6 +167,9 @@ func ReadCallSpots(ctx context.Context, cacheDir string, day time.Time, dxCall s
 	}
 	file, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ReadStats{Path: path, DXCall: call}, nil
+		}
 		return nil, ReadStats{}, err
 	}
 	defer file.Close()

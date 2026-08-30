@@ -131,6 +131,28 @@ func TestBuildArchiveWritesEmptyFileForFocusedCallWithNoSpots(t *testing.T) {
 	}
 }
 
+func TestReadCallSpotsMissingFocusedFileReturnsEmpty(t *testing.T) {
+	cacheDir := t.TempDir()
+	day := time.Date(2023, 11, 5, 0, 0, 0, 0, time.UTC)
+
+	spots, stats, err := ReadCallSpots(context.Background(), cacheDir, day, "6Y1V")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(spots), 0; got != want {
+		t.Fatalf("spots = %d, want %d", got, want)
+	}
+	if got, want := stats.DXCall, "6Y1V"; got != want {
+		t.Fatalf("DXCall = %q, want %q", got, want)
+	}
+	if got, want := stats.Records, 0; got != want {
+		t.Fatalf("records = %d, want %d", got, want)
+	}
+	if !strings.HasSuffix(stats.Path, "6Y1V.jsonl") {
+		t.Fatalf("stats path does not point to focused cache file: %s", stats.Path)
+	}
+}
+
 func TestBuildArchiveRequiresFocusedCallsign(t *testing.T) {
 	archivePath := writeArchive(t, "20251129.csv", strings.Join([]string{
 		"callsign,de_pfx,de_cont,freq,band,dx,dx_pfx,dx_cont,mode,db,date,speed,tx_mode",
