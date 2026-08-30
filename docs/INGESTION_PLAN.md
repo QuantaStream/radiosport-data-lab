@@ -217,6 +217,32 @@ go run ./cmd/rbn-archive-load \
   /tmp/rbn-data/20260821.zip
 ```
 
+Laptop-safe flat backfill with a durable checkpoint after each file:
+
+```bash
+go run ./cmd/rbn-archive-load \
+  -target http://127.0.0.1:8088/ingest/json \
+  -batch-size 1000 \
+  -workers 1 \
+  -day-workers 1 \
+  -spot-type rbn_spot_flat \
+  -qrz-parents=false \
+  -activity-parents=true \
+  -loader-idle-timeout 2m \
+  -commit-after-file \
+  -commit-timeout 5m \
+  -dense-spot-ids \
+  /tmp/rbn-data/20260821.zip
+```
+
+Use this shape when running large backfills on a laptop and durability matters
+more than wall-clock throughput. `accepted` means the loader accepted the HTTP
+batch into its work queue. It does not mean all in-memory fragments have been
+flushed and committed yet. `-loader-idle-timeout` waits until the loader queue
+and open sessions drain, and `-commit-after-file` asks the loader to commit
+after each archive file. The commit option intentionally requires
+`-day-workers=1` so each file has a deterministic checkpoint boundary.
+
 Use the flat path when the goal is measuring archive loader throughput without
 relationship-vector or QRZ-cache work. Use the normal `rbn_spot` path when the
 goal is exercising the full relationship-aware application model.
@@ -255,11 +281,21 @@ QSO. Ranking prefers closest time, then closest frequency, then strongest
 signal, then lowest spot ID. The numeric `match_score` is a zero-to-100 blend
 weighted primarily toward time proximity.
 
+When `-spotter-profile-mysql-dsn` is supplied, the matcher reads
+`spotter_profiles` once before matching and materializes calibrated signal
+fields on each match row. `spotter_baseline_db` uses the current profile's
+`normalization_offset_db`, which is the spotter p50 signal baseline.
+`normalized_signal_db = signal_db - spotter_baseline_db`, and
+`weighted_signal_db = normalized_signal_db * spotter_weight`. Missing profiles
+fall back to `spotter_profile_found=0`, `spotter_profile_quality='unknown'`,
+`spotter_weight=1`, and `spotter_baseline_db=0`.
+
 ```bash
 go run ./cmd/contest-spot-match-load \
   -target http://127.0.0.1:8088/ingest/json \
   -batch-size 1000 \
   -cty-dat data/cty/cty.dat \
+  -spotter-profile-mysql-dsn 'qstream@tcp(127.0.0.1:4000)/quanta?parseTime=true' \
   -window 5m \
   -frequency-tolerance-khz 0 \
   https://cqww.com/publiclogs/2025cw/ti8x.log \
@@ -282,6 +318,7 @@ go run ./cmd/contest-spot-match-load \
   -target http://127.0.0.1:8088/ingest/json \
   -batch-size 1000 \
   -cty-dat data/cty/cty.dat \
+  -spotter-profile-mysql-dsn 'qstream@tcp(127.0.0.1:4000)/quanta?parseTime=true' \
   -rbn-cache /tmp/rbn-cache-ti8x \
   -window 5m \
   https://cqww.com/publiclogs/2025cw/ti8x.log \
@@ -481,7 +518,7 @@ the loader can keep moving.
 
 The useful first joins are:
 
-- `contest_qsos.log_id -> contest_logs.log_id`
+- `contest_qsos.log_num_id -> contest_logs.log_num_id`
 - `contest_qsos.qso_day_key -> swpc_daily_indices.day_key`
 - `contest_qsos.qso_3h_bucket_key -> swpc_k_indices_3h.bucket_key`
 - `contest_qsos.activity_5m_ref -> activity_5m_buckets.activity_5m_id`

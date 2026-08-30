@@ -1,2 +1,28 @@
 data/cty/cty.dat
-data/swpc/
+
+# Downloaded data and local caches
+*.adi
+*.adif
+*.cab
+*.log
+*.zip
+*.jsonl
+*.csv
+*.tsv
+*.sqlite
+*.db
+cache/
+tmp/
+work/
+reports/
+output/
+
+# QuantaStream runtime data
+qstream-data/
+quantastream-data/
+storage.wal
+*.wal
+
+# Local tool state
+.env
+*.local

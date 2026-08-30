@@ -264,6 +264,8 @@ func (b *builder) applyGeo(observation Observation) {
 func (b *builder) summary(options Options) Summary {
 	sort.Ints(b.signals)
 	avg := float64(b.signalSum) / float64(b.totalSpots)
+	p50 := percentileNearestRank(b.signals, 0.50)
+	p90 := percentileNearestRank(b.signals, 0.90)
 	weight := 0.0
 	if b.totalSpots > 0 {
 		weight = 1 / math.Sqrt(float64(b.totalSpots))
@@ -297,10 +299,10 @@ func (b *builder) summary(options Options) Summary {
 		AvgSignalDB:           avg,
 		MinSignalDB:           b.minSignal,
 		MaxSignalDB:           b.maxSignal,
-		P50SignalDB:           percentileNearestRank(b.signals, 0.50),
-		P90SignalDB:           percentileNearestRank(b.signals, 0.90),
+		P50SignalDB:           p50,
+		P90SignalDB:           p90,
 		SpotterWeight:         weight,
-		NormalizationOffsetDB: avg,
+		NormalizationOffsetDB: p50,
 		ProfileQuality:        quality,
 		ComputedAt:            options.ComputedAt,
 	}

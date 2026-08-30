@@ -30,6 +30,7 @@ func main() {
 	sourceFile := flag.String("source-file", "", "source label override stored in QS rows")
 	activityParents := flag.Bool("activity-parents", true, "emit activity_5m_bucket parent events before contest_qso child rows")
 	parentFlushWait := flag.Duration("parent-flush-wait", 2*time.Second, "wait after posting parent rows before posting contest_qso child rows")
+	loaderIdleTimeout := flag.Duration("loader-idle-timeout", 60*time.Second, "maximum time to wait for qstream-loader to drain parent rows before posting contest_qso child rows; 0 disables stats polling")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: cabrillo-load [flags] <Cabrillo log path or URL> [...]\n")
 		flag.PrintDefaults()
@@ -100,6 +101,15 @@ func main() {
 		}
 		if *parentFlushWait > 0 {
 			time.Sleep(*parentFlushWait)
+		}
+		if *loaderIdleTimeout > 0 {
+			statsURL, err := loaderStatsURL(*target)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := waitLoaderIdle(ctx, statsURL, *loaderIdleTimeout, *timeout); err != nil {
+				log.Fatal(err)
+			}
 		}
 		qsoEvents := make([]interface{}, 0, len(qsos))
 		for _, qso := range qsos {
@@ -198,4 +208,74 @@ func postEvents(ctx context.Context, target string, events []interface{}, batchS
 		failed += resp.Failed
 	}
 	return accepted, failed, nil
+}
+
+type loaderStats struct {
+	Router struct {
+		TotalQueued      int `json:"total_queued"`
+		OpenSessionCount int `json:"open_session_count"`
+	} `json:"router"`
+}
+
+func loaderStatsURL(target string) (string, error) {
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return "", err
+	}
+	parsed.Path = "/stats"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func waitLoaderIdle(ctx context.Context, statsURL string, idleTimeout time.Duration, requestTimeout time.Duration) error {
+	deadline := time.NewTimer(idleTimeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	var lastErr error
+	for {
+		idle, err := fetchLoaderIdle(ctx, statsURL, requestTimeout)
+		if err == nil && idle {
+			return nil
+		}
+		if err != nil {
+			lastErr = err
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			if lastErr != nil {
+				return fmt.Errorf("loader did not drain parent rows within %s: last stats error: %w", idleTimeout, lastErr)
+			}
+			return fmt.Errorf("loader did not drain parent rows within %s", idleTimeout)
+		case <-ticker.C:
+		}
+	}
+}
+
+func fetchLoaderIdle(ctx context.Context, statsURL string, requestTimeout time.Duration) (bool, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, statsURL, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return false, fmt.Errorf("GET %s: %s", statsURL, resp.Status)
+	}
+	var stats loaderStats
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		return false, err
+	}
+	return stats.Router.TotalQueued == 0 && stats.Router.OpenSessionCount == 0, nil
 }

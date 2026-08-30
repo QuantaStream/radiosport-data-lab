@@ -1,20 +1,26 @@
 tableName: contest_logs
-primaryKey: log_id
+primaryKey: log_num_id
 selector: type="contest_log"
 attributes:
+- fieldName: log_num_id
+  sourceName: /data/log_num_id
+  mappingStrategy: IntBSI
+  type: Integer
+  columnID: true
+  sourceOrdinal: 1
 - fieldName: log_id
   sourceName: /data/log_id
   mappingStrategy: StringLexBSI
   configuration:
-    length: "16"
+    length: "32"
   type: String
   maxLen: 96
-  sourceOrdinal: 1
+  sourceOrdinal: 2
 - fieldName: contest_id
   sourceName: /data/contest_id
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 2
+  sourceOrdinal: 3
 - fieldName: station_call
   sourceName: /data/station_call
   mappingStrategy: StringLexBSI
@@ -22,99 +28,99 @@ attributes:
     length: "8"
   type: String
   maxLen: 16
-  sourceOrdinal: 3
+  sourceOrdinal: 4
 - fieldName: station_prefix
   sourceName: /data/station_prefix
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 4
+  sourceOrdinal: 5
 - fieldName: station_continent
   sourceName: /data/station_continent
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 5
+  sourceOrdinal: 6
 - fieldName: station_country
   sourceName: /data/station_country
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 6
+  sourceOrdinal: 7
 - fieldName: cq_zone
   sourceName: /data/cq_zone
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 7
+  sourceOrdinal: 8
 - fieldName: itu_zone
   sourceName: /data/itu_zone
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 8
+  sourceOrdinal: 9
 - fieldName: station_latitude
   sourceName: /data/station_latitude
   mappingStrategy: FloatScaleBSI
   type: Float
   scale: 4
-  sourceOrdinal: 9
+  sourceOrdinal: 10
 - fieldName: station_longitude
   sourceName: /data/station_longitude
   mappingStrategy: FloatScaleBSI
   type: Float
   scale: 4
-  sourceOrdinal: 10
+  sourceOrdinal: 11
 - fieldName: station_geo_source
   sourceName: /data/station_geo_source
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 11
+  sourceOrdinal: 12
 - fieldName: station_geo_confidence
   sourceName: /data/station_geo_confidence
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 12
+  sourceOrdinal: 13
 - fieldName: category_operator
   sourceName: /data/category_operator
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 13
+  sourceOrdinal: 14
 - fieldName: category_assisted
   sourceName: /data/category_assisted
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 14
+  sourceOrdinal: 15
 - fieldName: category_band
   sourceName: /data/category_band
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 15
+  sourceOrdinal: 16
 - fieldName: category_power
   sourceName: /data/category_power
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 16
+  sourceOrdinal: 17
 - fieldName: category_mode
   sourceName: /data/category_mode
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 17
+  sourceOrdinal: 18
 - fieldName: category_transmitter
   sourceName: /data/category_transmitter
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 18
+  sourceOrdinal: 19
 - fieldName: claimed_score
   sourceName: /data/claimed_score
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 19
+  sourceOrdinal: 20
 - fieldName: qso_count
   sourceName: /data/qso_count
   mappingStrategy: IntBSI
   type: Integer
-  sourceOrdinal: 20
+  sourceOrdinal: 21
 - fieldName: scope_region
   sourceName: /data/scope_region
   mappingStrategy: StringEnum
   type: String
-  sourceOrdinal: 21
+  sourceOrdinal: 22
 - fieldName: source_file
   sourceName: /data/source_file
   mappingStrategy: StringLexBSI
@@ -122,11 +128,11 @@ attributes:
     length: "16"
   type: String
   maxLen: 160
-  sourceOrdinal: 22
+  sourceOrdinal: 23
 - fieldName: loaded_at
   sourceName: /data/loaded_at
   mappingStrategy: TimestampBSI
   configuration:
     granularity: "second"
   type: DateTime
-  sourceOrdinal: 23
+  sourceOrdinal: 24

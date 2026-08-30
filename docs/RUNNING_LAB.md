@@ -131,6 +131,11 @@ curl -fsS http://127.0.0.1:8088/healthz
 curl -fsS http://127.0.0.1:8088/stats | python3 -m json.tool | head -120
 ```
 
+For laptop loading, use the loader stats, table counts, and OS process RSS as
+the operational signals. The QS admin status memory column is a best-effort
+serialized cache-size estimate from the engine. It can skip busy shards and is
+not a reliable capacity-planning number during active ingest.
+
 Useful log tail:
 
 ```bash
@@ -204,9 +209,10 @@ The workflow expects QS and `qstream-loader` to already be running. It creates
 tables if needed, truncates child-first when `--reset` is supplied, reloads SWPC
 context, loads focused RBN rows for one DX call or a small competitor pack,
 loads public Cabrillo logs, materializes exact QSO-to-spot matches for each log,
-builds current spotter calibration profiles and station activity summaries, and
-refreshes views. Set `RBN_PROFILE_BUILD=0` to skip profile generation during
-quick parser-only iterations. Set `RBN_STATION_ACTIVITY_BUILD=0` to skip station
+builds station activity summaries, and refreshes views. Spotter profile
+calibration is opt-in with `RBN_PROFILE_BUILD=1` while its relationship key path
+is being hardened; see `SPOTTER_PROFILES_DESIGN.md` for the numeric
+`spotter_node_id` follow-up. Set `RBN_STATION_ACTIVITY_BUILD=0` to skip station
 activity summaries.
 
 ```bash
@@ -224,7 +230,7 @@ Default inputs:
 | Station | `TI8X` |
 | CTY file | `data/cty/cty.dat` |
 | Loader URL | `http://127.0.0.1:8088` |
-| Spotter profile build | enabled; set `RBN_PROFILE_BUILD=0` to skip |
+| Spotter profile build | disabled; set `RBN_PROFILE_BUILD=1` to enable |
 | Station activity build | enabled for the focused station list; set `RBN_STATION_ACTIVITY_BUILD=0` to skip |
 
 Override examples:
@@ -246,12 +252,38 @@ RBN_SPOT_WORKERS=4 \
 ./scripts/run-ti8x-contest-workflow.sh --reset
 ```
 
+For laptop runs where a large archive reload should create a durable checkpoint
+after each daily file, run the archive phase serially and let
+`rbn-archive-load` wait for the loader to drain before committing:
+
+```bash
+RBN_DAY_WORKERS=1 \
+RBN_ARCHIVE_LOADER_IDLE_TIMEOUT=2m \
+RBN_ARCHIVE_COMMIT_AFTER_FILE=1 \
+./scripts/run-ti8x-contest-workflow.sh --reset
+```
+
+Keep the laptop RBN window narrow. The CQWW SSB planning workflow should start
+with selected two-to-four-day archive sets, filtered to the target station and
+peer callsigns where possible. Broad 20-plus-day analog sweeps should be treated
+as AWS-scale or offline-cache work.
+
 Use the same DX-call list for RBN archive loading and cache building. The
 workflow handles that automatically through `CONTEST_STATIONS`, then loads and
 matches each Cabrillo log listed in `CONTEST_LOG_URLS`. The filter is only on
 the spotted DX call; all RBN spotter/receiver stations remain in the loaded
 data, including important Caribbean spotters such as `TI7W`. Add `PJ4K` or
 `ZF1A` when a larger Caribbean comparison pack is useful.
+
+The workflow loads Cabrillo logs one at a time and pauses after parent rows
+before sending child QSO rows. Override `RBN_PARENT_FLUSH_WAIT` only when testing
+loader timing directly.
+
+Schema activation and reset use the MySQL-compatible endpoint with `CREATE TABLE
+<name>` and `TRUNCATE TABLE <name>`, so the same workflow works for single-node
+and distributed runs. For single-node, start `quantastream` with `-config-dir`
+pointing at this repository's `configuration` directory. For distributed mode,
+start `quantastream-proxy` with `-schema-dir` pointing at the same directory.
 
 ## Tableau Notes
 

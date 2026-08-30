@@ -195,6 +195,49 @@ group by band
 order by qsos desc;
 ```
 
+Calibrated signal by band:
+
+```sql
+select
+  station_call,
+  band,
+  avg(raw_signal_db) as avg_snr,
+  avg(normalized_signal_db) as avg_normalized_snr,
+  sum(calibrated_reach_numerator) / sum(calibrated_reach_weight) as calibrated_reach_snr,
+  count(*) as qsos
+from contest_competitiveness_signal_base
+group by station_call, band
+order by station_call, band;
+```
+
+Logged QSO volume by station, band, and hour:
+
+```sql
+select
+  station_call,
+  band,
+  qso_hour,
+  count(*) as logged_qsos
+from contest_competitiveness_qso_base
+group by station_call, band, qso_hour
+order by station_call, band, qso_hour;
+```
+
+Calibrated signal by receiving continent:
+
+```sql
+select
+  station_call,
+  band,
+  receiving_continent,
+  avg(raw_signal_db) as avg_snr,
+  sum(calibrated_reach_numerator) / sum(calibrated_reach_weight) as calibrated_reach_snr,
+  count(*) as matched_qsos
+from contest_competitiveness_signal_base
+group by station_call, band, receiving_continent
+order by station_call, band, matched_qsos desc;
+```
+
 Best matches by spotter:
 
 ```sql
@@ -350,7 +393,7 @@ order by spots desc;
 
 These rows are calibration metadata. The first weighting policy is deliberately
 simple: high-volume spotters get `spotter_weight = 1 / sqrt(total_spots)`, while
-`normalization_offset_db` starts as the spotter's average reported signal.
+`normalization_offset_db` starts as the spotter's p50 reported signal.
 
 ## Station Activity
 
@@ -401,6 +444,8 @@ Use these views as first Tableau logical tables:
 | --- | --- |
 | `contest_best_spot_match_base` | `qso_hour` by `band`, colored by `avg(signal_db)` |
 | `contest_spot_match_base` | spotter quality and match-rank inspection |
+| `contest_competitiveness_qso_base` | logged QSO volume by `qso_hour`, `band`, and `station_call` |
+| `contest_competitiveness_signal_base` | calibrated signal reach by station, band, hour, and receiving continent |
 | `contest_qso_propagation_base` | QSO volume by band, worked continent, SFI, Kp |
 | `rbn_spot_propagation_base` | RBN spot volume by band, prefix, SFI, Kp |
 | `spotter_profile_base` | spotter volume, baseline signal, and calibration quality |

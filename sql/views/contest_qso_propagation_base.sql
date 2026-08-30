@@ -1,9 +1,15 @@
 create or replace view contest_qso_propagation_base as
 select
   q.qso_id as qso_id,
+  q.log_num_id as log_num_id,
   q.log_id as log_id,
   q.contest_id as contest_id,
   q.qso_at as qso_at,
+  year(q.qso_at) as qso_year,
+  mm(q.qso_at) as qso_month,
+  day(q.qso_at) as qso_day,
+  dayofweek(q.qso_at) as qso_day_of_week,
+  hourofday(q.qso_at) as qso_hour,
   q.qso_day_key as qso_day_key,
   q.qso_3h_bucket_key as qso_3h_bucket_key,
   q.qso_5m_bucket_key as qso_5m_bucket_key,
@@ -56,7 +62,7 @@ select
   k.source as swpc_k_source
 from contest_qsos as q
 inner join contest_logs as l
-  on q.log_id = l.log_id
+  on q.log_num_id = l.log_num_id
 inner join activity_5m_buckets as a
   on q.activity_5m_ref = a.activity_5m_id
 inner join swpc_daily_indices as d

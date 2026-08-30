@@ -24,11 +24,19 @@ type Options struct {
 	MaxMatchesPerQSO      int
 	DenseMatchIDs         bool
 	LoadedAt              time.Time
+	SpotterProfiles       map[string]SpotterProfile
+}
+
+type SpotterProfile struct {
+	SpotterWeight float64
+	BaselineDB    float64
+	Quality       string
 }
 
 type Match struct {
 	MatchID               uint64
 	ContestID             string
+	LogNumID              uint64
 	LogID                 string
 	QSOID                 uint64
 	SpotID                uint64
@@ -68,6 +76,12 @@ type Match struct {
 	MatchScore            float64
 	MatchRank             int
 	IsBestMatch           int
+	SpotterProfileFound   int
+	SpotterProfileQuality string
+	SpotterWeight         float64
+	SpotterBaselineDB     float64
+	NormalizedSignalDB    float64
+	WeightedSignalDB      float64
 	Source                string
 	LoadedAt              time.Time
 }
@@ -95,6 +109,7 @@ func MatchQSOsToSpots(qsos []cabrillo.QSO, spots []rbn.Spot, options Options) []
 			return spotsByKey[key][i].SpottedAt.Before(spotsByKey[key][j].SpottedAt)
 		})
 	}
+	spotterProfiles := normalizeSpotterProfiles(options.SpotterProfiles)
 
 	var matches []Match
 	for _, qso := range qsos {
@@ -103,7 +118,8 @@ func MatchQSOsToSpots(qsos []cabrillo.QSO, spots []rbn.Spot, options Options) []
 			candidates = candidates[:options.MaxMatchesPerQSO]
 		}
 		for i, spot := range candidates {
-			match := NewMatch(qso, spot, window, options.FrequencyToleranceKHz, loadedAt)
+			profile, profileFound := lookupSpotterProfile(spotterProfiles, spot.SpotterCall)
+			match := NewMatchWithProfile(qso, spot, window, options.FrequencyToleranceKHz, loadedAt, profile, profileFound)
 			match.MatchRank = i + 1
 			if i == 0 {
 				match.IsBestMatch = 1
@@ -120,6 +136,10 @@ func MatchQSOsToSpots(qsos []cabrillo.QSO, spots []rbn.Spot, options Options) []
 }
 
 func NewMatch(qso cabrillo.QSO, spot rbn.Spot, window time.Duration, frequencyToleranceKHz float64, loadedAt time.Time) Match {
+	return NewMatchWithProfile(qso, spot, window, frequencyToleranceKHz, loadedAt, SpotterProfile{}, false)
+}
+
+func NewMatchWithProfile(qso cabrillo.QSO, spot rbn.Spot, window time.Duration, frequencyToleranceKHz float64, loadedAt time.Time, profile SpotterProfile, profileFound bool) Match {
 	timeDelta := int(spot.SpottedAt.Sub(qso.QSOAt).Seconds())
 	frequencyDelta := spot.FrequencyKHz - qso.FrequencyKHz
 	sameBucket := 0
@@ -136,9 +156,25 @@ func NewMatch(qso cabrillo.QSO, spot rbn.Spot, window time.Duration, frequencyTo
 	if loadedAt.IsZero() {
 		loadedAt = time.Now().UTC()
 	}
+	spotterWeight := profile.SpotterWeight
+	if spotterWeight <= 0 {
+		spotterWeight = 1
+	}
+	spotterBaselineDB := profile.BaselineDB
+	spotterProfileQuality := strings.TrimSpace(profile.Quality)
+	if spotterProfileQuality == "" {
+		spotterProfileQuality = "unknown"
+	}
+	spotterProfileFound := 0
+	if profileFound {
+		spotterProfileFound = 1
+	}
+	normalizedSignalDB := float64(spot.SignalDB) - spotterBaselineDB
+	weightedSignalDB := normalizedSignalDB * spotterWeight
 	return Match{
 		MatchID:               StableMatchID(qso.QSOID, spot.SpotID),
 		ContestID:             qso.ContestID,
+		LogNumID:              qso.LogNumID,
 		LogID:                 qso.LogID,
 		QSOID:                 qso.QSOID,
 		SpotID:                spot.SpotID,
@@ -176,9 +212,42 @@ func NewMatch(qso cabrillo.QSO, spot rbn.Spot, window time.Duration, frequencyTo
 		TimeScore:             timeScore,
 		FrequencyScore:        frequencyScore,
 		MatchScore:            matchScore,
+		SpotterProfileFound:   spotterProfileFound,
+		SpotterProfileQuality: spotterProfileQuality,
+		SpotterWeight:         spotterWeight,
+		SpotterBaselineDB:     spotterBaselineDB,
+		NormalizedSignalDB:    normalizedSignalDB,
+		WeightedSignalDB:      weightedSignalDB,
 		Source:                "materialized",
 		LoadedAt:              loadedAt,
 	}
+}
+
+func normalizeSpotterProfiles(input map[string]SpotterProfile) map[string]SpotterProfile {
+	if len(input) == 0 {
+		return nil
+	}
+	output := make(map[string]SpotterProfile, len(input))
+	for call, profile := range input {
+		normalizedCall, ok := rbn.NormalizeCallsign(call)
+		if !ok {
+			continue
+		}
+		output[normalizedCall] = profile
+	}
+	return output
+}
+
+func lookupSpotterProfile(profiles map[string]SpotterProfile, spotterCall string) (SpotterProfile, bool) {
+	if len(profiles) == 0 {
+		return SpotterProfile{}, false
+	}
+	call, ok := rbn.NormalizeCallsign(spotterCall)
+	if !ok {
+		return SpotterProfile{}, false
+	}
+	profile, ok := profiles[call]
+	return profile, ok
 }
 
 func StableMatchID(qsoID uint64, spotID uint64) uint64 {

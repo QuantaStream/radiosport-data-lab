@@ -215,7 +215,8 @@ is Tier 1 Caribbean and Central America logs, not all worldwide logs.
 
 | Column | Source | Mapper | Notes |
 | --- | --- | --- | --- |
-| `log_id` | generated | `StringLexBSI length=16 maxLen=96` | Stable log identity. |
+| `log_num_id` | generated hash | `IntBSI columnID` | Stable numeric table key used for relationship-vector joins. |
+| `log_id` | generated | `StringLexBSI length=32 maxLen=96` | Readable log identity. Station-first IDs such as `TI8X:cq-ww-cw-2025` preserve selectivity when several station logs share one contest. |
 | `contest_id` | source | `StringEnum` | Example: `cqww-cw-2025`. |
 | `station_call` | Cabrillo header | `StringLexBSI length=8 maxLen=16` | Submitted station. |
 | `station_prefix`, `station_continent`, `station_country` | CTY parser | `StringEnum` | Regional classification. |
@@ -236,7 +237,8 @@ submitted log and SWPC time buckets.
 | Column | Source | Mapper | Notes |
 | --- | --- | --- | --- |
 | `qso_id` | generated | `IntBSI` | Primary key and column ID. |
-| `log_id` | generated | `ParentRelation` | Joins to `contest_logs`. |
+| `log_num_id` | generated hash | `ParentRelation -> contest_logs` | Relationship-vector join to the submitted log. |
+| `log_id` | generated | `StringLexBSI length=32 maxLen=96` | Readable station/contest identifier. |
 | `contest_id` | source | `StringEnum` | Keeps common filters local. |
 | `qso_at` | QSO line | `TimestampBSI` | UTC QSO time. |
 | `qso_day_key` | generated `YYYYMMDD` | `ParentRelation` | Joins to `swpc_daily_indices`. |
@@ -264,7 +266,8 @@ analysts need to evaluate them.
 | --- | --- | --- | --- |
 | `match_id` | generated | `IntBSI` | Dense primary key and column ID for compact storage. |
 | `contest_id` | QSO | `StringEnum` | Contest identity. |
-| `log_id` | QSO | `ParentRelation -> contest_logs` | Submitted log parent. |
+| `log_num_id` | QSO | `ParentRelation -> contest_logs` | Submitted log parent. |
+| `log_id` | QSO | `StringLexBSI length=32 maxLen=96` | Readable station/contest identifier. |
 | `qso_ref` | QSO | `ParentRelation -> contest_qsos` | Matched QSO row. |
 | `spot_ref` | RBN spot | `ParentRelation -> spots_flat` | Matched RBN spot row. |
 | `qso_activity_5m_ref`, `spot_activity_5m_ref` | derived hashes | `ParentRelation -> activity_5m_buckets` | Links each side back to its five-minute bucket. |

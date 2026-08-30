@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/QuantaStream/radiosport-data-lab/internal/swpc"
 )
 
 func TestYearlyFilename(t *testing.T) {
@@ -22,7 +24,7 @@ func TestYearlyFilename(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, err := yearlyFilename(test.product, test.year)
+		got, err := swpc.YearlyFilename(test.product, test.year)
 		if err != nil {
 			t.Fatalf("yearlyFilename(%q, %d): %v", test.product, test.year, err)
 		}
@@ -39,7 +41,7 @@ func TestResolveYearlySourceUsesCachedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := resolveYearlySource(context.Background(), "solar", 2025, cacheDir, "http://127.0.0.1:1", false, time.Second)
+	got, err := swpc.ResolveYearlySource(context.Background(), "solar", 2025, cacheDir, "http://127.0.0.1:1", false, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +60,7 @@ func TestResolveYearlySourceDownloadsMissingFile(t *testing.T) {
 	defer server.Close()
 
 	cacheDir := t.TempDir()
-	got, err := resolveYearlySource(context.Background(), "geomag", 2025, cacheDir, server.URL, false, time.Second)
+	got, err := swpc.ResolveYearlySource(context.Background(), "geomag", 2025, cacheDir, server.URL, false, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +87,7 @@ func TestResolveYearlySourceFallsBackToSecondBaseURL(t *testing.T) {
 
 	cacheDir := t.TempDir()
 	baseURLs := "http://127.0.0.1:1," + server.URL + "/archive/{year}"
-	got, err := resolveYearlySource(context.Background(), "solar", 2025, cacheDir, baseURLs, false, 100*time.Millisecond)
+	got, err := swpc.ResolveYearlySource(context.Background(), "solar", 2025, cacheDir, baseURLs, false, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +101,7 @@ func TestResolveYearlySourceFallsBackToSecondBaseURL(t *testing.T) {
 }
 
 func TestHistoricalSourceURLsExpandYearTemplates(t *testing.T) {
-	got := historicalSourceURLs("https://example.test/root, https://example.test/archive/{year}/", "2025_DSD.txt", 2025)
+	got := swpc.HistoricalSourceURLs("https://example.test/root, https://example.test/archive/{year}/", "2025_DSD.txt", 2025)
 	want := []string{
 		"https://example.test/root/2025_DSD.txt",
 		"https://example.test/archive/2025/2025_DSD.txt",

@@ -2,7 +2,6 @@
 set -Eeuo pipefail
 
 app_repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-qs_repo="${QS_REPO:-$HOME/projects/quantastream}"
 loader_url="${RBN_LOADER_URL:-http://127.0.0.1:8088}"
 mysql_host="${RBN_MYSQL_HOST:-127.0.0.1}"
 mysql_port="${RBN_MYSQL_PORT:-4000}"
@@ -19,10 +18,12 @@ spot_workers="${RBN_SPOT_WORKERS:-4}"
 day_workers="${RBN_DAY_WORKERS:-2}"
 window="${CONTEST_MATCH_WINDOW:-5m}"
 frequency_tolerance="${CONTEST_FREQUENCY_TOLERANCE_KHZ:-0}"
-max_matches="${CONTEST_MAX_MATCHES_PER_QSO:-0}"
-parent_flush_wait="${RBN_PARENT_FLUSH_WAIT:-2s}"
+max_matches="${CONTEST_MAX_MATCHES_PER_QSO:-1}"
+parent_flush_wait="${RBN_PARENT_FLUSH_WAIT:-10s}"
 loader_wait_seconds="${RBN_LOADER_WAIT_SECONDS:-900}"
-profile_build="${RBN_PROFILE_BUILD:-1}"
+archive_loader_idle_timeout="${RBN_ARCHIVE_LOADER_IDLE_TIMEOUT:-0}"
+archive_commit_after_file="${RBN_ARCHIVE_COMMIT_AFTER_FILE:-0}"
+profile_build="${RBN_PROFILE_BUILD:-0}"
 station_activity_build="${RBN_STATION_ACTIVITY_BUILD:-1}"
 station_activity_dx_call="${RBN_STATION_ACTIVITY_DX_CALL:-}"
 out_dir="${RBN_WORKFLOW_DIR:-/tmp/radiosport-ti8x-workflow-$(date -u +%Y%m%dT%H%M%SZ)}"
@@ -44,11 +45,10 @@ QuantaStream server and qstream-loader:
   5. build a parsed RBN day/callsign cache
   6. load one or more Cabrillo logs
   7. materialize exact spot/QSO matches from the cache for each log
-  8. build spotter calibration profiles
+  8. optionally build spotter calibration profiles
   9. install analyst views and print verification queries
 
 Environment overrides:
-  QS_REPO=$qs_repo
   RBN_LOADER_URL=$loader_url
   RBN_MYSQL_HOST=$mysql_host
   RBN_MYSQL_PORT=$mysql_port
@@ -57,10 +57,13 @@ Environment overrides:
   CONTEST_STATION=$primary_station
   CONTEST_STATIONS=$stations_csv
   CONTEST_LOG_URLS=$contest_logs_csv
+  CONTEST_MAX_MATCHES_PER_QSO=$max_matches
   RBN_CACHE_DIR=$cache_dir
   RBN_STATION_ACTIVITY_BUILD=$station_activity_build
   RBN_STATION_ACTIVITY_DX_CALL=$station_activity_dx_call
   RBN_PROFILE_BUILD=$profile_build
+  RBN_ARCHIVE_LOADER_IDLE_TIMEOUT=$archive_loader_idle_timeout
+  RBN_ARCHIVE_COMMIT_AFTER_FILE=$archive_commit_after_file
 USAGE
 }
 
@@ -164,6 +167,15 @@ if [ "${#archives[@]}" -eq 0 ]; then
 fi
 mapfile -t archives < <(printf '%s\n' "${archives[@]}" | sort)
 
+if [ "$archive_commit_after_file" = "1" ] && [ "$day_workers" != "1" ]; then
+  echo "RBN_ARCHIVE_COMMIT_AFTER_FILE=1 requires RBN_DAY_WORKERS=1 for deterministic per-file commits" >&2
+  exit 2
+fi
+if [ "$archive_commit_after_file" = "1" ] && [ "$archive_loader_idle_timeout" = "0" ]; then
+  echo "RBN_ARCHIVE_COMMIT_AFTER_FILE=1 requires RBN_ARCHIVE_LOADER_IDLE_TIMEOUT, for example 2m" >&2
+  exit 2
+fi
+
 mkdir -p "$out_dir"
 
 log() {
@@ -172,10 +184,6 @@ log() {
 
 mysql_exec() {
   mysql -h "$mysql_host" -P "$mysql_port" -u "$mysql_user" -D "$mysql_db" "$@"
-}
-
-admin() {
-  (cd "$qs_repo" && go run ./qstream-admin "$@")
 }
 
 capture_loader_stats() {
@@ -256,17 +264,25 @@ parent_flush_wait_q="$(shell_quote "$parent_flush_wait")"
 mysql_dsn_q="$(shell_quote "${mysql_user}@tcp(${mysql_host}:${mysql_port})/${mysql_db}?parseTime=true")"
 archives_args="$(shell_args "${archives[@]}")"
 cache_days_args="$(shell_args "${cache_days[@]}")"
-contest_logs_args="$(shell_args "${contest_logs[@]}")"
 cty_args_string="$(shell_args "${cty_args[@]}")"
+archive_loader_args=()
+if [ "$archive_loader_idle_timeout" != "0" ]; then
+  archive_loader_args=(-loader-idle-timeout "$archive_loader_idle_timeout")
+fi
+if [ "$archive_commit_after_file" = "1" ]; then
+  archive_loader_args+=(-commit-after-file)
+fi
+archive_loader_args_string="$(shell_args "${archive_loader_args[@]}")"
 
 log "output_dir=$out_dir"
-log "qs_repo=$qs_repo"
 log "app_repo=$app_repo"
 log "loader_url=$loader_url"
 log "mysql=${mysql_host}:${mysql_port}/${mysql_db} user=${mysql_user}"
 log "dx_calls=$station_filter contest_logs=${contest_logs[*]}"
 log "cache_dir=$cache_dir"
+log "match_window=$window max_matches_per_qso=$max_matches"
 log "station_activity_build=$station_activity_build station_activity_dx_calls=${station_activity_calls[*]}"
+log "archive_loader_idle_timeout=$archive_loader_idle_timeout archive_commit_after_file=$archive_commit_after_file"
 printf '%s\n' "${archives[@]}" > "$out_dir/archives.txt"
 printf '%s\n' "${cache_days[@]}" > "$out_dir/cache-days.txt"
 printf '%s\n' "${stations[@]}" > "$out_dir/stations.txt"
@@ -282,14 +298,14 @@ capture_loader_stats "before"
 if [ "$create_schema" = "1" ]; then
   for table in swpc_daily_indices swpc_k_indices_3h activity_5m_buckets spots_flat contest_logs contest_qsos contest_spot_matches rbn_spotter_nodes spotter_profile_snapshots spotter_profiles station_activity_5m_summaries; do
     log "create table ${table}"
-    admin create --port="$mysql_port" --schema-dir="$app_repo/configuration" "$table" 2>&1 | tee -a "$out_dir/schema-create.log"
+    mysql_exec -e "create table ${table};" 2>&1 | tee -a "$out_dir/schema-create.log"
   done
 fi
 
 if [ "$reset" = "1" ]; then
   for table in station_activity_5m_summaries spotter_profile_snapshots spotter_profiles rbn_spotter_nodes contest_spot_matches contest_qsos spots_flat swpc_k_indices_3h contest_logs activity_5m_buckets swpc_daily_indices; do
     log "truncate table ${table}"
-    admin truncate --port="$mysql_port" "$table" 2>&1 | tee -a "$out_dir/truncate.log"
+    mysql_exec -e "truncate table ${table};" 2>&1 | tee -a "$out_dir/truncate.log"
   done
 fi
 
@@ -299,7 +315,7 @@ wait_loader_idle
 capture_loader_stats "after-swpc"
 
 run_step rbn-archive-load \
-  bash -lc "cd $app_repo_q && go run ./cmd/rbn-archive-load -target $loader_ingest_q -batch-size '$spot_batch_size' -workers '$spot_workers' -day-workers '$day_workers' -spot-type rbn_spot_flat -qrz-parents=false -dense-spot-ids -dx-call $station_filter_q$archives_args"
+  bash -lc "cd $app_repo_q && go run ./cmd/rbn-archive-load -target $loader_ingest_q -batch-size '$spot_batch_size' -workers '$spot_workers' -day-workers '$day_workers' -spot-type rbn_spot_flat -qrz-parents=false -dense-spot-ids -dx-call $station_filter_q$archive_loader_args_string$archives_args"
 wait_loader_idle
 capture_loader_stats "after-spots"
 
@@ -324,16 +340,20 @@ if [ "$profile_build" = "1" ]; then
   capture_loader_stats "after-spotter-profiles"
 fi
 
-run_step cabrillo-load \
-  bash -lc "cd $app_repo_q && go run ./cmd/cabrillo-load -target $loader_ingest_q -batch-size '$batch_size' -parent-flush-wait $parent_flush_wait_q$cty_args_string$contest_logs_args"
-wait_loader_idle
-capture_loader_stats "after-cabrillo"
+for contest_log in "${contest_logs[@]}"; do
+  contest_log_q="$(shell_quote "$contest_log")"
+  contest_label="$(safe_label "$(basename "$contest_log")")"
+  run_step "cabrillo-load-${contest_label}" \
+    bash -lc "cd $app_repo_q && go run ./cmd/cabrillo-load -target $loader_ingest_q -batch-size '$batch_size' -parent-flush-wait $parent_flush_wait_q$cty_args_string $contest_log_q"
+  wait_loader_idle
+  capture_loader_stats "after-cabrillo-${contest_label}"
+done
 
 for contest_log in "${contest_logs[@]}"; do
   contest_log_q="$(shell_quote "$contest_log")"
   contest_label="$(safe_label "$(basename "$contest_log")")"
   run_step "contest-spot-match-load-${contest_label}" \
-    bash -lc "cd $app_repo_q && go run ./cmd/contest-spot-match-load -target $loader_ingest_q -batch-size '$batch_size'$cty_args_string -rbn-cache $cache_dir_q -window '$window' -frequency-tolerance-khz '$frequency_tolerance' -max-matches-per-qso '$max_matches' $contest_log_q$cache_days_args"
+    bash -lc "cd $app_repo_q && go run ./cmd/contest-spot-match-load -target $loader_ingest_q -batch-size '$batch_size'$cty_args_string -spotter-profile-mysql-dsn $mysql_dsn_q -rbn-cache $cache_dir_q -window '$window' -frequency-tolerance-khz '$frequency_tolerance' -max-matches-per-qso '$max_matches' -dense-match-ids=false $contest_log_q$cache_days_args"
   wait_loader_idle
   capture_loader_stats "after-matches-${contest_label}"
 done
@@ -345,6 +365,9 @@ if [ "$install_views" = "1" ]; then
   run_mysql_file "$app_repo/sql/views/contest_rbn_activity_5m_base.sql"
   run_mysql_file "$app_repo/sql/views/contest_spot_match_base.sql"
   run_mysql_file "$app_repo/sql/views/contest_best_spot_match_base.sql"
+  run_mysql_file "$app_repo/sql/views/contest_calibrated_spot_match_base.sql"
+  run_mysql_file "$app_repo/sql/views/contest_competitiveness_qso_base.sql"
+  run_mysql_file "$app_repo/sql/views/contest_competitiveness_signal_base.sql"
   run_mysql_file "$app_repo/sql/views/spotter_profile_base.sql"
   run_mysql_file "$app_repo/sql/views/station_activity_5m_base.sql"
 fi
@@ -363,24 +386,32 @@ select count(*) as station_activity_5m_count from station_activity_5m_summaries;
 " | tee "$out_dir/counts.txt"
 
 log "verification match summary"
-mysql_exec -e "
+: > "$out_dir/match-summary.txt"
+for station in "${stations[@]}"; do
+  station_sql="$(sql_string_list "$station")"
+  mysql_exec -e "
 select station_call, band, match_kind, count(*) as matches
 from contest_spot_match_base
-where station_call in ($station_sql_list)
+where station_call = $station_sql
 group by station_call, band, match_kind
-order by station_call, matches desc
-limit 60;
-" | tee "$out_dir/match-summary.txt"
+order by matches desc
+limit 30;
+" | tee -a "$out_dir/match-summary.txt"
+done
 
 log "verification best-match summary"
-mysql_exec -e "
+: > "$out_dir/best-match-summary.txt"
+for station in "${stations[@]}"; do
+  station_sql="$(sql_string_list "$station")"
+  mysql_exec -e "
 select station_call, band, count(*) as best_matches, avg(match_score) as avg_match_score
 from contest_best_spot_match_base
-where station_call in ($station_sql_list)
+where station_call = $station_sql
 group by station_call, band
-order by station_call, best_matches desc
-limit 60;
-" | tee "$out_dir/best-match-summary.txt"
+order by best_matches desc
+limit 20;
+" | tee -a "$out_dir/best-match-summary.txt"
+done
 
 log "verification spotter profile summary"
 mysql_exec -e "
@@ -391,24 +422,32 @@ limit 20;
 " | tee "$out_dir/spotter-profile-summary.txt"
 
 log "verification station activity summary"
-mysql_exec -e "
+: > "$out_dir/station-activity-summary.txt"
+for station in "${stations[@]}"; do
+  station_sql="$(sql_string_list "$station")"
+  mysql_exec -e "
 select dx_call, band, spotter_continent, spot_count, distinct_spotters, avg_signal_db, reach_score
 from station_activity_5m_base
-where dx_call in ($station_sql_list)
-order by dx_call, reach_score desc
-limit 80;
-" | tee "$out_dir/station-activity-summary.txt"
+where dx_call = $station_sql
+order by reach_score desc
+limit 30;
+" | tee -a "$out_dir/station-activity-summary.txt"
+done
 
 log "verification propagation summary"
-mysql_exec -e "
+: > "$out_dir/propagation-summary.txt"
+for station in "${stations[@]}"; do
+  station_sql="$(sql_string_list "$station")"
+  mysql_exec -e "
 select dx_call, band, dx_prefix, sfi, kp_index, count(*) as spots
 from rbn_spot_propagation_base
 where spotted_at between todate('$from_day') and todate('$to_day 23:59:59')
-  and dx_call in ($station_sql_list)
+  and dx_call = $station_sql
 group by dx_call, band, dx_prefix, sfi, kp_index
-order by dx_call, spots desc
-limit 80;
-" | tee "$out_dir/propagation-summary.txt"
+order by spots desc
+limit 30;
+" | tee -a "$out_dir/propagation-summary.txt"
+done
 
 capture_loader_stats "final"
 log "workflow complete"

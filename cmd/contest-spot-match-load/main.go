@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/QuantaStream/radiosport-data-lab/internal/cabrillo"
 	"github.com/QuantaStream/radiosport-data-lab/internal/callsign"
@@ -36,6 +39,8 @@ func main() {
 	maxMatchesPerQSO := flag.Int("max-matches-per-qso", 0, "maximum closest spot matches per QSO; 0 keeps all matches")
 	denseSpotIDs := flag.Bool("dense-spot-ids", true, "assign the same day-local dense spot ids used by archive loads")
 	denseMatchIDs := flag.Bool("dense-match-ids", true, "assign contiguous match_id values for compact QS storage")
+	spotterProfileDSN := flag.String("spotter-profile-mysql-dsn", "", "optional QS MySQL-wire DSN used to read spotter_profiles for calibrated signal metrics")
+	spotterProfileTable := flag.String("spotter-profile-table", "spotter_profiles", "QS table containing current spotter calibration profiles")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: contest-spot-match-load [flags] <Cabrillo log path or URL> <RBN daily .zip or .csv> [...]\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "       contest-spot-match-load -rbn-cache <cache-dir> [flags] <Cabrillo log path or URL> <YYYY-MM-DD> [...]\n")
@@ -73,12 +78,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	spotterProfiles, err := loadSpotterProfiles(ctx, *spotterProfileDSN, *spotterProfileTable)
+	if err != nil {
+		log.Printf("spotter profile calibration disabled: %v", err)
+	}
+	if len(spotterProfiles) > 0 {
+		log.Printf("spotter profile calibration loaded profiles=%d table=%s", len(spotterProfiles), *spotterProfileTable)
+	}
 	matches := contestmatch.MatchQSOsToSpots(qsos, spots, contestmatch.Options{
 		Window:                *window,
 		FrequencyToleranceKHz: *frequencyToleranceKHz,
 		MaxMatchesPerQSO:      *maxMatchesPerQSO,
 		DenseMatchIDs:         *denseMatchIDs,
 		LoadedAt:              time.Now().UTC(),
+		SpotterProfiles:       spotterProfiles,
 	})
 	events := contestmatch.Events(matches)
 
@@ -107,6 +120,58 @@ type spotSourceStats struct {
 	Rows          int
 	RejectedRows  int
 	SkippedFooter int
+}
+
+func loadSpotterProfiles(ctx context.Context, dsn string, table string) (map[string]contestmatch.SpotterProfile, error) {
+	dsn = strings.TrimSpace(dsn)
+	if dsn == "" {
+		return nil, nil
+	}
+	table = strings.TrimSpace(table)
+	if err := validateIdentifier(table); err != nil {
+		return nil, fmt.Errorf("-spotter-profile-table: %w", err)
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	if err := db.PingContext(ctx); err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("select spotter_call, spotter_weight, normalization_offset_db, profile_quality from %s", table))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	profiles := map[string]contestmatch.SpotterProfile{}
+	for rows.Next() {
+		var call sql.NullString
+		var weight sql.NullFloat64
+		var baseline sql.NullFloat64
+		var quality sql.NullString
+		if err := rows.Scan(&call, &weight, &baseline, &quality); err != nil {
+			return nil, err
+		}
+		normalizedCall, ok := rbn.NormalizeCallsign(nullString(call))
+		if !ok {
+			continue
+		}
+		profileQuality := strings.TrimSpace(quality.String)
+		if !quality.Valid || profileQuality == "" {
+			profileQuality = "unknown"
+		}
+		profiles[normalizedCall] = contestmatch.SpotterProfile{
+			SpotterWeight: nullFloat(weight, 1),
+			BaselineDB:    nullFloat(baseline, 0),
+			Quality:       profileQuality,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return profiles, nil
 }
 
 func loadContestLog(ctx context.Context, source string, timeout time.Duration, sourceFile string, contestID string, scopeRegion string, db *callsign.Database) (cabrillo.Log, []cabrillo.QSO, error) {
@@ -218,6 +283,37 @@ func loadCallsignDB(path string) (*callsign.Database, error) {
 	}
 	db, _, err := callsign.LoadDefault()
 	return db, err
+}
+
+func validateIdentifier(value string) error {
+	if value == "" {
+		return fmt.Errorf("value is required")
+	}
+	for i, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r == '_':
+		case i > 0 && r >= '0' && r <= '9':
+		default:
+			return fmt.Errorf("unsupported identifier %q", value)
+		}
+	}
+	return nil
+}
+
+func nullString(value sql.NullString) string {
+	if !value.Valid {
+		return ""
+	}
+	return strings.TrimSpace(value.String)
+}
+
+func nullFloat(value sql.NullFloat64, fallback float64) float64 {
+	if !value.Valid {
+		return fallback
+	}
+	return value.Float64
 }
 
 func openSource(ctx context.Context, source string, timeout time.Duration) (io.ReadCloser, error) {

@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"sync"
@@ -29,6 +32,9 @@ func main() {
 	denseSpotIDs := flag.Bool("dense-spot-ids", false, "assign day-local dense spot ids for storage-friendly archive backfills")
 	dxCallFilter := flag.String("dx-call", "", "optional comma-separated DX callsign filter, for example TI8X,V47T,8P5A")
 	parentFlushWait := flag.Duration("parent-flush-wait", 2*time.Second, "wait after posting generated parent rows before posting child rows")
+	loaderIdleTimeout := flag.Duration("loader-idle-timeout", 0, "maximum time to wait for qstream-loader to drain after parent rows and each archive file; 0 disables stats polling")
+	commitAfterFile := flag.Bool("commit-after-file", false, "POST qstream-loader /commit after each archive file; requires -day-workers=1 and -loader-idle-timeout for deterministic file boundaries")
+	commitTimeout := flag.Duration("commit-timeout", 5*time.Minute, "request timeout for -commit-after-file /commit calls")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-request timeout")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: rbn-archive-load [flags] <RBN daily .zip or .csv> [...]\n")
@@ -52,6 +58,12 @@ func main() {
 	if (*workers > 1 || *dayWorkers > 1) && *qrzParents {
 		log.Fatal("-workers or -day-workers greater than 1 requires -qrz-parents=false; relationship loads must preserve parent-before-spot order")
 	}
+	if *commitAfterFile && *dayWorkers > 1 {
+		log.Fatal("-commit-after-file requires -day-workers=1 so each archive file has a deterministic durable boundary")
+	}
+	if *commitAfterFile && *loaderIdleTimeout <= 0 {
+		log.Fatal("-commit-after-file requires -loader-idle-timeout so queued loader work drains before commit")
+	}
 	dxCalls, err := rbncache.NormalizeDXCalls([]string{*dxCallFilter})
 	if err != nil {
 		log.Fatal(err)
@@ -63,17 +75,20 @@ func main() {
 
 	sort.Strings(paths)
 	config := loadConfig{
-		target:          *target,
-		batchSize:       *batchSize,
-		postWorkers:     *workers,
-		limit:           *limit,
-		spotType:        *spotType,
-		qrzParents:      *qrzParents,
-		activityParents: *activityParents,
-		denseSpotIDs:    *denseSpotIDs,
-		dxCallFilters:   dxCallFilters,
-		parentFlushWait: *parentFlushWait,
-		timeout:         *timeout,
+		target:            *target,
+		batchSize:         *batchSize,
+		postWorkers:       *workers,
+		limit:             *limit,
+		spotType:          *spotType,
+		qrzParents:        *qrzParents,
+		activityParents:   *activityParents,
+		denseSpotIDs:      *denseSpotIDs,
+		dxCallFilters:     dxCallFilters,
+		parentFlushWait:   *parentFlushWait,
+		loaderIdleTimeout: *loaderIdleTimeout,
+		commitAfterFile:   *commitAfterFile,
+		commitTimeout:     *commitTimeout,
+		timeout:           *timeout,
 	}
 
 	startedAt := time.Now()
@@ -88,9 +103,9 @@ func main() {
 		rejectedRows += result.rejectedRows
 		skippedFooter += result.skippedFooter
 		if len(paths) > 1 {
-			fmt.Fprintf(os.Stderr, "file=%s rows=%d emitted=%d parents=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
-				result.path, result.rows, result.emitted, result.parentEvents, result.accepted, result.failed, result.rejectedRows,
-				result.skippedFooter, result.elapsed.Round(time.Millisecond))
+			fmt.Fprintf(os.Stderr, "file=%s rows=%d emitted=%d parents=%d accepted=%d failed=%d commits=%d rejected=%d skipped_footer=%d elapsed=%s\n",
+				result.path, result.rows, result.emitted, result.parentEvents, result.accepted, result.failed, result.commitCount,
+				result.rejectedRows, result.skippedFooter, result.elapsed.Round(time.Millisecond))
 		}
 		if result.err != nil && firstErr == nil {
 			firstErr = result.err
@@ -100,8 +115,12 @@ func main() {
 	for _, result := range results {
 		parentEvents += result.parentEvents
 	}
-	fmt.Fprintf(os.Stderr, "files=%d rows=%d emitted=%d parents=%d accepted=%d failed=%d rejected=%d skipped_footer=%d elapsed=%s\n",
-		len(paths), rows, emitted, parentEvents, accepted, failed, rejectedRows, skippedFooter, time.Since(startedAt).Round(time.Millisecond))
+	var commitCount int
+	for _, result := range results {
+		commitCount += result.commitCount
+	}
+	fmt.Fprintf(os.Stderr, "files=%d rows=%d emitted=%d parents=%d accepted=%d failed=%d commits=%d rejected=%d skipped_footer=%d elapsed=%s\n",
+		len(paths), rows, emitted, parentEvents, accepted, failed, commitCount, rejectedRows, skippedFooter, time.Since(startedAt).Round(time.Millisecond))
 	if firstErr != nil {
 		log.Fatal(firstErr)
 	}
@@ -196,6 +215,13 @@ func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoa
 			if config.parentFlushWait > 0 {
 				time.Sleep(config.parentFlushWait)
 			}
+			if config.loaderIdleTimeout > 0 {
+				if err := waitLoaderIdle(ctx, config, "activity parent rows"); err != nil {
+					result.err = err
+					result.elapsed = time.Since(startedAt)
+					return result
+				}
+			}
 		}
 	}
 
@@ -275,6 +301,20 @@ func loadArchive(ctx context.Context, config loadConfig, path string) archiveLoa
 	result.failed += failed
 	result.rejectedRows = stats.RejectedRows
 	result.skippedFooter = stats.SkippedFooter
+	if result.err == nil && failed == 0 {
+		if config.loaderIdleTimeout > 0 {
+			if err := waitLoaderIdle(ctx, config, "archive file"); err != nil {
+				result.err = err
+			}
+		}
+		if result.err == nil && config.commitAfterFile && result.accepted > 0 {
+			commits, err := commitLoader(ctx, config)
+			result.commitCount += commits
+			if err != nil {
+				result.err = err
+			}
+		}
+	}
 	result.elapsed = time.Since(startedAt)
 	if failed > 0 {
 		result.err = fmt.Errorf("%s had %d loader failures", path, failed)
@@ -360,17 +400,20 @@ type postResult struct {
 }
 
 type loadConfig struct {
-	target          string
-	batchSize       int
-	postWorkers     int
-	limit           int
-	spotType        string
-	qrzParents      bool
-	activityParents bool
-	denseSpotIDs    bool
-	dxCallFilters   map[string]struct{}
-	parentFlushWait time.Duration
-	timeout         time.Duration
+	target            string
+	batchSize         int
+	postWorkers       int
+	limit             int
+	spotType          string
+	qrzParents        bool
+	activityParents   bool
+	denseSpotIDs      bool
+	dxCallFilters     map[string]struct{}
+	parentFlushWait   time.Duration
+	loaderIdleTimeout time.Duration
+	commitAfterFile   bool
+	commitTimeout     time.Duration
+	timeout           time.Duration
 }
 
 type archiveLoadResult struct {
@@ -380,6 +423,7 @@ type archiveLoadResult struct {
 	parentEvents  int
 	accepted      int
 	failed        int
+	commitCount   int
 	rejectedRows  int
 	skippedFooter int
 	elapsed       time.Duration
@@ -478,4 +522,125 @@ func (p *batchPoster) post(events []interface{}) postResult {
 		return postResult{err: fmt.Errorf("loader accounted for %d events, posted %d", resp.Accepted+resp.Failed, len(events))}
 	}
 	return postResult{accepted: resp.Accepted, failed: resp.Failed}
+}
+
+type loaderStats struct {
+	Router struct {
+		TotalQueued      int `json:"total_queued"`
+		OpenSessionCount int `json:"open_session_count"`
+	} `json:"router"`
+}
+
+type loaderCommitResponse struct {
+	Status string `json:"status"`
+	Flush  struct {
+		ErrorCount int `json:"error_count"`
+	} `json:"flush"`
+	Commit struct {
+		CommitCount int `json:"commit_count"`
+	} `json:"commit"`
+	Error string `json:"error"`
+}
+
+func waitLoaderIdle(ctx context.Context, config loadConfig, label string) error {
+	statsURL, err := loaderEndpoint(config.target, "/stats")
+	if err != nil {
+		return err
+	}
+	deadline := time.NewTimer(config.loaderIdleTimeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	var lastErr error
+	for {
+		idle, err := fetchLoaderIdle(ctx, statsURL, config.timeout)
+		if err == nil && idle {
+			return nil
+		}
+		if err != nil {
+			lastErr = err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			if lastErr != nil {
+				return fmt.Errorf("loader did not drain %s within %s: last stats error: %w", label, config.loaderIdleTimeout, lastErr)
+			}
+			return fmt.Errorf("loader did not drain %s within %s", label, config.loaderIdleTimeout)
+		case <-ticker.C:
+		}
+	}
+}
+
+func fetchLoaderIdle(ctx context.Context, statsURL string, requestTimeout time.Duration) (bool, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, statsURL, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return false, fmt.Errorf("GET %s: %s", statsURL, resp.Status)
+	}
+	var stats loaderStats
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		return false, err
+	}
+	return stats.Router.TotalQueued == 0 && stats.Router.OpenSessionCount == 0, nil
+}
+
+func commitLoader(ctx context.Context, config loadConfig) (int, error) {
+	commitURL, err := loaderEndpoint(config.target, "/commit")
+	if err != nil {
+		return 0, err
+	}
+	timeout := config.commitTimeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, commitURL, nil)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	var body loaderCommitResponse
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return 0, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if body.Error != "" {
+			return body.Commit.CommitCount, fmt.Errorf("POST %s: %s: %s", commitURL, resp.Status, body.Error)
+		}
+		return body.Commit.CommitCount, fmt.Errorf("POST %s: %s", commitURL, resp.Status)
+	}
+	if body.Flush.ErrorCount > 0 {
+		return body.Commit.CommitCount, fmt.Errorf("loader commit flush reported %d errors", body.Flush.ErrorCount)
+	}
+	return body.Commit.CommitCount, nil
+}
+
+func loaderEndpoint(target string, path string) (string, error) {
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return "", err
+	}
+	parsed.Path = path
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
 }

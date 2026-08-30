@@ -34,6 +34,7 @@ type ParseStats struct {
 }
 
 type Log struct {
+	LogNumID             uint64
 	LogID                string
 	ContestID            string
 	StationCall          string
@@ -61,6 +62,7 @@ type Log struct {
 
 type QSO struct {
 	QSOID            uint64
+	LogNumID         uint64
 	LogID            string
 	ContestID        string
 	QSOAt            time.Time
@@ -158,8 +160,10 @@ func Parse(r io.Reader, options ParseOptions) (Log, []QSO, ParseStats, error) {
 	station := enrichCall(options.CallsignDB, stationCall)
 	contestID := contestID(headers, rawQSOs[0].qsoAt, options.ContestID)
 	logID := stableLogID(contestID, stationCall)
+	logNumID := stableLogNumID(logID)
 
 	log := Log{
+		LogNumID:             logNumID,
 		LogID:                logID,
 		ContestID:            contestID,
 		StationCall:          stationCall,
@@ -189,6 +193,7 @@ func Parse(r io.Reader, options ParseOptions) (Log, []QSO, ParseStats, error) {
 	for _, raw := range rawQSOs {
 		worked := enrichCall(options.CallsignDB, raw.workedCall)
 		qso := QSO{
+			LogNumID:         log.LogNumID,
 			LogID:            log.LogID,
 			ContestID:        log.ContestID,
 			QSOAt:            raw.qsoAt,
@@ -310,7 +315,17 @@ func contestID(headers map[string]string, firstQSO time.Time, override string) s
 }
 
 func stableLogID(contestID string, stationCall string) string {
-	return normalizeIdentifier(contestID) + ":" + strings.ToUpper(strings.TrimSpace(stationCall))
+	return strings.ToUpper(strings.TrimSpace(stationCall)) + ":" + normalizeIdentifier(contestID)
+}
+
+func stableLogNumID(logID string) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(strings.ToUpper(strings.TrimSpace(logID))))
+	id := h.Sum64() & ((uint64(1) << 63) - 1)
+	if id == 0 {
+		return 1
+	}
+	return id
 }
 
 func stableQSOID(qso QSO, lineNumber int) uint64 {

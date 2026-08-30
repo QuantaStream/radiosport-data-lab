@@ -79,6 +79,12 @@ desired signal: each daily file routes to a separate physical day shard, so
 parallelism comes from independent day-level build lanes rather than splitting
 one day by logical hash.
 
+For laptop runs, do not use the QS admin status `MEMORY` column as a capacity
+estimate. That value is a best-effort serialized cache-size sample from the
+engine, not process RSS, and active ingest can make it skip busy shards. Use
+visible row-count parity, loader drain stats, `free`, and process RSS when
+judging whether a local run is healthy.
+
 ## AWS Distributed Backfill
 
 AWS testing used a three-node distributed QuantaStream cluster with the

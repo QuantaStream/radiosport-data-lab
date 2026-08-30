@@ -13,7 +13,7 @@ func TestBuildSummariesComputesVolumeWeightAndPercentiles(t *testing.T) {
 	observations := []Observation{
 		{SpotterCall: "k3lr", SpotterPrefix: "K", SpotterContinent: "NA", SpotterCountry: "United States", SpotterCQZone: 5, SpotterITUZone: 8, SpotterLatitude: 37.6, SpotterLongitude: -91.87, SpotterGeoSource: geo.SourceCTY, SpotterGeoConfidence: geo.ConfidenceCountryCentroid, DXCall: "TI8X", DXPrefix: "TI", SignalDB: 10, SpottedAt: base},
 		{SpotterCall: "K3LR", SpotterPrefix: "K", SpotterContinent: "NA", SpotterCountry: "United States", SpotterCQZone: 5, SpotterITUZone: 8, SpotterLatitude: 37.6, SpotterLongitude: -91.87, SpotterGeoSource: geo.SourceCTY, SpotterGeoConfidence: geo.ConfidenceCountryCentroid, DXCall: "TI8X", DXPrefix: "TI", SignalDB: 20, SpottedAt: base.Add(1 * time.Hour)},
-		{SpotterCall: "K3LR", SpotterPrefix: "K", SpotterContinent: "NA", SpotterCountry: "United States", SpotterCQZone: 5, SpotterITUZone: 8, SpotterLatitude: 37.6, SpotterLongitude: -91.87, SpotterGeoSource: geo.SourceCTY, SpotterGeoConfidence: geo.ConfidenceCountryCentroid, DXCall: "N7ZG", DXPrefix: "K", SignalDB: 30, SpottedAt: base.Add(2 * time.Hour)},
+		{SpotterCall: "K3LR", SpotterPrefix: "K", SpotterContinent: "NA", SpotterCountry: "United States", SpotterCQZone: 5, SpotterITUZone: 8, SpotterLatitude: 37.6, SpotterLongitude: -91.87, SpotterGeoSource: geo.SourceCTY, SpotterGeoConfidence: geo.ConfidenceCountryCentroid, DXCall: "N7ZG", DXPrefix: "K", SignalDB: 100, SpottedAt: base.Add(2 * time.Hour)},
 		{SpotterCall: "DF2CK", SpotterPrefix: "DL", SpotterContinent: "EU", SpotterCountry: "Fed. Rep. of Germany", SpotterCQZone: 14, SpotterITUZone: 28, SpotterLatitude: 51, SpotterLongitude: 10, SpotterGeoSource: geo.SourceCTY, SpotterGeoConfidence: geo.ConfidenceCountryCentroid, DXCall: "TI8X", DXPrefix: "TI", SignalDB: 40, SpottedAt: base},
 	}
 
@@ -51,7 +51,7 @@ func TestBuildSummariesComputesVolumeWeightAndPercentiles(t *testing.T) {
 	if profileEvent.Data.CountryName != "United States" || profileEvent.Data.GeoConfidence != geo.ConfidenceCountryCentroid {
 		t.Fatalf("profile event geo = %+v", profileEvent.Data)
 	}
-	if k3lr.AvgSignalDB != 20 || k3lr.P50SignalDB != 20 || k3lr.P90SignalDB != 30 {
+	if math.Abs(k3lr.AvgSignalDB-43.333333333333336) > 0.0000001 || k3lr.P50SignalDB != 20 || k3lr.P90SignalDB != 100 || k3lr.NormalizationOffsetDB != 20 {
 		t.Fatalf("unexpected K3LR signal stats: avg=%v p50=%v p90=%v", k3lr.AvgSignalDB, k3lr.P50SignalDB, k3lr.P90SignalDB)
 	}
 	wantWeight := 1 / math.Sqrt(3)

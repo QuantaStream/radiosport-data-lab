@@ -44,8 +44,11 @@ func TestParseCabrilloCQWWLog(t *testing.T) {
 	if stats.QSOLines != 2 || stats.ParsedQSOs != 2 || stats.RejectedQSOs != 0 {
 		t.Fatalf("stats = %#v, want 2 parsed QSOs", stats)
 	}
-	if log.LogID != "cq-ww-cw-2025:TI8X" || log.ContestID != "cq-ww-cw-2025" {
+	if log.LogID != "TI8X:cq-ww-cw-2025" || log.ContestID != "cq-ww-cw-2025" {
 		t.Fatalf("log ids = %q/%q", log.LogID, log.ContestID)
+	}
+	if log.LogNumID == 0 {
+		t.Fatal("log_num_id = 0, want stable non-zero id")
 	}
 	if log.StationCall != "TI8X" || log.CategoryOperator != "SINGLE-OP" || log.ClaimedScore != 4476480 {
 		t.Fatalf("log = %#v", log)
@@ -55,6 +58,9 @@ func TestParseCabrilloCQWWLog(t *testing.T) {
 	}
 	if len(qsos) != 2 {
 		t.Fatalf("len(qsos) = %d", len(qsos))
+	}
+	if qsos[0].LogNumID != log.LogNumID || qsos[1].LogNumID != log.LogNumID {
+		t.Fatalf("qso log refs = %d/%d, want %d", qsos[0].LogNumID, qsos[1].LogNumID, log.LogNumID)
 	}
 	if qsos[0].QSOAt.Format(time.RFC3339) != "2025-11-29T00:02:00Z" {
 		t.Fatalf("qso time = %s", qsos[0].QSOAt)
@@ -121,13 +127,13 @@ func TestNewEventsKeepsParentBeforeQSOs(t *testing.T) {
 	if len(events) != 5 {
 		t.Fatalf("len(events) = %d", len(events))
 	}
-	if event, ok := events[0].(LogEvent); !ok || event.Type != LogEventType || event.Data.LogID != log.LogID {
+	if event, ok := events[0].(LogEvent); !ok || event.Type != LogEventType || event.Data.LogID != log.LogID || event.Data.LogNumID != log.LogNumID {
 		t.Fatalf("event[0] = %#v, want parent log event", events[0])
 	}
 	if event, ok := events[1].(rbn.Activity5MBucketEvent); !ok || event.Type != rbn.Activity5MBucketEventType {
 		t.Fatalf("event[1] = %#v, want activity parent event", events[1])
 	}
-	if event, ok := events[3].(QSOEvent); !ok || event.Type != QSOEventType || event.Data.LogID != log.LogID {
+	if event, ok := events[3].(QSOEvent); !ok || event.Type != QSOEventType || event.Data.LogID != log.LogID || event.Data.LogNumID != log.LogNumID {
 		t.Fatalf("event[3] = %#v, want child qso event", events[3])
 	}
 }

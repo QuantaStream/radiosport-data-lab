@@ -150,7 +150,8 @@ The first two tables are:
 - `contest_logs`: one row per accepted submitted log
 - `contest_qsos`: one row per parsed Cabrillo `QSO:` line
 
-`contest_qsos.log_id` is a relationship vector to `contest_logs.log_id`.
+`contest_qsos.log_num_id` is a relationship vector to `contest_logs.log_num_id`;
+`log_id` remains a readable station/contest identifier.
 `contest_qsos.qso_day_key` and `contest_qsos.qso_3h_bucket_key` are relationship
 vectors to the SWPC tables. This makes propagation context directly joinable to
 submitted contest QSOs.
@@ -210,7 +211,7 @@ Useful first questions:
 The important joins are by exact relationship where possible, and by bounded
 time/frequency predicates where not:
 
-- `contest_qsos.log_id -> contest_logs.log_id`
+- `contest_qsos.log_num_id -> contest_logs.log_num_id`
 - `contest_qsos.qso_day_key -> swpc_daily_indices.day_key`
 - `contest_qsos.qso_3h_bucket_key -> swpc_k_indices_3h.bucket_key`
 - RBN spots to SWPC by precomputed day/3-hour keys once those fields are added

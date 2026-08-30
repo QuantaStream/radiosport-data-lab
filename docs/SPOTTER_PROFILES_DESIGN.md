@@ -52,6 +52,23 @@ machine-readable feed.
 
 This is reference metadata. It should not block live spot ingestion.
 
+Relationship-key hardening note: the current first-cut schema uses
+`spotter_call` as the `rbn_spotter_nodes` primary key and uses
+`spotter_call_ref` as the child relationship key from profile rows. That is
+query-friendly but forces load-time string-key lookup through `StringLexBSI` to
+discover the parent row ID. Before spotter profile generation becomes part of
+the default workflow, move this path to a stable numeric surrogate key:
+
+- `rbn_spotter_nodes.spotter_node_id` as `IntBSI columnID` primary key
+- `spotter_profiles.spotter_node_id` as `ParentRelation -> rbn_spotter_nodes`
+- `spotter_profile_snapshots.spotter_node_id` as `ParentRelation -> rbn_spotter_nodes`
+- keep `spotter_call` as `StringLexBSI length=8 maxLen=16` for filtering,
+  grouping, projection, Tableau labels, and human-readable identity
+
+This is primarily a load-time and relationship-vector construction hardening
+change. Query behavior for `spotter_call` should remain the same because the
+natural callsign field stays queryable.
+
 ### `spotter_profile_snapshots`
 
 `spotter_profile_snapshots` stores computed behavior for a spotter over a fixed
@@ -85,7 +102,7 @@ band-specific.
 | `p50_signal_db` | `FloatScaleBSI scale=2` | Median, computed offline. |
 | `p90_signal_db` | `FloatScaleBSI scale=2` | High-side signal reference. |
 | `volume_weight` | `FloatScaleBSI scale=6` | Weight derived from total spot volume. |
-| `normalization_offset_db` | `FloatScaleBSI scale=2` | Baseline value for normalized SNR. |
+| `normalization_offset_db` | `FloatScaleBSI scale=2` | Median/p50 baseline value for normalized SNR. |
 | `profile_quality` | `StringEnum` | `good`, `sparse`, `stale`, `unknown`. |
 | `computed_at` | `TimestampBSI` | Job execution time. |
 
@@ -119,7 +136,7 @@ The simplest useful weighting is volume based:
 
 ```text
 spotter_weight = 1 / sqrt(total_spots)
-weighted_snr = sum(signal_db * spotter_weight) / sum(spotter_weight)
+calibrated_reach_snr = sum(weighted_signal_db) / sum(spotter_weight)
 ```
 
 That prevents one very active skimmer from overwhelming the result. It is easy
@@ -139,9 +156,9 @@ The more interesting long-term metric is normalized SNR:
 normalized_snr = signal_db - spotter_baseline_signal_db
 ```
 
-Where `spotter_baseline_signal_db` can start as `avg_signal_db` and later move
-to `p50_signal_db` or a band/mode-specific baseline. This asks whether the
-station was loud relative to what that spotter normally hears.
+Where `spotter_baseline_signal_db` starts as `p50_signal_db` and can later move
+to a band/mode-specific baseline. This asks whether the station was loud
+relative to what that spotter normally hears.
 
 ## Reach Metrics
 
@@ -221,7 +238,7 @@ expose:
 | Column | Meaning |
 | --- | --- |
 | `spotter_weight` | Current calibration weight. |
-| `avg_signal_db` | Spotter baseline. |
+| `avg_signal_db` | Spotter mean signal report. |
 | `normalization_offset_db` | Current offset for normalized SNR. |
 | `profile_quality` | Whether the calibration is trustworthy. |
 | `total_spots` | Spotter volume during the source window. |
@@ -237,18 +254,21 @@ select
   qso_hour,
   band,
   spotter_continent,
-  avg(signal_db) as avg_snr,
-  sum(signal_db * spotter_weight) / sum(spotter_weight) as weighted_snr,
-  avg(signal_db - spotter_avg_signal_db) as avg_normalized_snr,
+  avg(raw_signal_db) as avg_snr,
+  avg(normalized_signal_db) as avg_normalized_snr,
+  sum(weighted_signal_db) / sum(spotter_weight) as calibrated_reach_snr,
   count(*) as qsos
-from contest_weighted_spot_match_base
+from contest_calibrated_spot_match_base
 group by qso_hour, band, spotter_continent
 order by qso_hour, band, qsos desc;
 ```
 
-If QS does not yet support every expression Tableau emits for this shape, the
-builder can materialize `weighted_signal_db` and `normalized_signal_db` into a
-match summary table.
+The current implementation materializes `spotter_weight`,
+`spotter_baseline_db`, `normalized_signal_db`, and `weighted_signal_db` into
+`contest_spot_matches`. `contest_calibrated_spot_match_base` exposes those
+columns for Tableau so dashboards can compute
+`SUM(weighted_signal_db) / SUM(spotter_weight)` without joining profile tables at
+worksheet time.
 
 ## Product Notes
 

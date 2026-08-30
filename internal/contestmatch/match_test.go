@@ -105,6 +105,46 @@ func TestMatchQSOsToSpotsUsesSignalAsFinalRankingTieBreaker(t *testing.T) {
 	}
 }
 
+func TestMatchQSOsToSpotsMaterializesSpotterProfileMetrics(t *testing.T) {
+	qsoAt := time.Date(2025, 11, 29, 0, 5, 0, 0, time.UTC)
+	spot := testSpot(10, qsoAt.Add(15*time.Second), 14025.1, "TI8X", "20m", "CW")
+	spot.SignalDB = 27
+
+	matches := MatchQSOsToSpots([]cabrillo.QSO{testQSO(qsoAt, 14025)}, []rbn.Spot{spot}, Options{
+		Window:        time.Minute,
+		DenseMatchIDs: true,
+		SpotterProfiles: map[string]SpotterProfile{
+			"k5tr": {
+				SpotterWeight: 0.25,
+				BaselineDB:    19,
+				Quality:       "good",
+			},
+		},
+	})
+
+	if got, want := len(matches), 1; got != want {
+		t.Fatalf("len(matches) = %d, want %d", got, want)
+	}
+	match := matches[0]
+	if match.SpotterProfileFound != 1 || match.SpotterProfileQuality != "good" {
+		t.Fatalf("profile fields = found %d quality %q", match.SpotterProfileFound, match.SpotterProfileQuality)
+	}
+	if math.Abs(match.SpotterWeight-0.25) > 0.0000001 || math.Abs(match.SpotterBaselineDB-19) > 0.0000001 {
+		t.Fatalf("profile calibration = weight %.6f baseline %.2f", match.SpotterWeight, match.SpotterBaselineDB)
+	}
+	if math.Abs(match.NormalizedSignalDB-8) > 0.0000001 || math.Abs(match.WeightedSignalDB-2) > 0.0000001 {
+		t.Fatalf("calibrated signal = normalized %.2f weighted %.2f", match.NormalizedSignalDB, match.WeightedSignalDB)
+	}
+
+	event := NewEvent(match)
+	if event.Data.SpotterProfileFound != 1 || event.Data.SpotterProfileQuality != "good" {
+		t.Fatalf("event profile fields = found %d quality %q", event.Data.SpotterProfileFound, event.Data.SpotterProfileQuality)
+	}
+	if math.Abs(event.Data.NormalizedSignalDB-8) > 0.0000001 || math.Abs(event.Data.WeightedSignalDB-2) > 0.0000001 {
+		t.Fatalf("event calibrated signal = normalized %.2f weighted %.2f", event.Data.NormalizedSignalDB, event.Data.WeightedSignalDB)
+	}
+}
+
 func TestNewEventFormatsPayload(t *testing.T) {
 	qsoAt := time.Date(2025, 11, 29, 0, 5, 0, 0, time.UTC)
 	match := NewMatch(
@@ -125,6 +165,9 @@ func TestNewEventFormatsPayload(t *testing.T) {
 	if event.Data.MatchKind != KindSameBucket || event.Data.SameActivityBucket != 1 {
 		t.Fatalf("kind/bucket = %q/%d", event.Data.MatchKind, event.Data.SameActivityBucket)
 	}
+	if event.Data.LogNumID != 42 || match.LogNumID != 42 {
+		t.Fatalf("log_num_id = %d/%d, want 42", event.Data.LogNumID, match.LogNumID)
+	}
 	if math.Abs(event.Data.TimeScore-90.0) > 0.001 {
 		t.Fatalf("time_score = %.3f, want 90.000", event.Data.TimeScore)
 	}
@@ -139,7 +182,8 @@ func TestNewEventFormatsPayload(t *testing.T) {
 func testQSO(qsoAt time.Time, freq float64) cabrillo.QSO {
 	qso := cabrillo.QSO{
 		QSOID:            9001,
-		LogID:            "cq-ww-cw-2025:TI8X",
+		LogNumID:         42,
+		LogID:            "TI8X:cq-ww-cw-2025",
 		ContestID:        "cq-ww-cw-2025",
 		QSOAt:            qsoAt,
 		QSODayKey:        rbn.DayKeyUTC(qsoAt),

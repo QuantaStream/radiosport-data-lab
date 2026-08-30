@@ -10,6 +10,7 @@ type Event struct {
 type Payload struct {
 	MatchID               uint64  `json:"match_id"`
 	ContestID             string  `json:"contest_id"`
+	LogNumID              uint64  `json:"log_num_id"`
 	LogID                 string  `json:"log_id"`
 	QSOID                 uint64  `json:"qso_id"`
 	SpotID                uint64  `json:"spot_id"`
@@ -49,6 +50,12 @@ type Payload struct {
 	MatchScore            float64 `json:"match_score"`
 	MatchRank             int     `json:"match_rank"`
 	IsBestMatch           int     `json:"is_best_match"`
+	SpotterProfileFound   int     `json:"spotter_profile_found"`
+	SpotterProfileQuality string  `json:"spotter_profile_quality"`
+	SpotterWeight         float64 `json:"spotter_weight"`
+	SpotterBaselineDB     float64 `json:"spotter_baseline_db"`
+	NormalizedSignalDB    float64 `json:"normalized_signal_db"`
+	WeightedSignalDB      float64 `json:"weighted_signal_db"`
 	Source                string  `json:"source"`
 	LoadedAt              string  `json:"loaded_at"`
 }
@@ -59,6 +66,7 @@ func NewEvent(match Match) Event {
 		Data: Payload{
 			MatchID:               match.MatchID,
 			ContestID:             match.ContestID,
+			LogNumID:              match.LogNumID,
 			LogID:                 match.LogID,
 			QSOID:                 match.QSOID,
 			SpotID:                match.SpotID,
@@ -98,6 +106,12 @@ func NewEvent(match Match) Event {
 			MatchScore:            match.MatchScore,
 			MatchRank:             match.MatchRank,
 			IsBestMatch:           match.IsBestMatch,
+			SpotterProfileFound:   match.SpotterProfileFound,
+			SpotterProfileQuality: match.SpotterProfileQuality,
+			SpotterWeight:         match.SpotterWeight,
+			SpotterBaselineDB:     match.SpotterBaselineDB,
+			NormalizedSignalDB:    match.NormalizedSignalDB,
+			WeightedSignalDB:      match.WeightedSignalDB,
 			Source:                match.Source,
 			LoadedAt:              formatTime(match.LoadedAt),
 		},

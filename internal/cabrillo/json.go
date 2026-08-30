@@ -17,6 +17,7 @@ type LogEvent struct {
 }
 
 type LogPayload struct {
+	LogNumID             uint64  `json:"log_num_id"`
 	LogID                string  `json:"log_id"`
 	ContestID            string  `json:"contest_id"`
 	StationCall          string  `json:"station_call"`
@@ -49,6 +50,7 @@ type QSOEvent struct {
 
 type QSOPayload struct {
 	QSOID            uint64  `json:"qso_id"`
+	LogNumID         uint64  `json:"log_num_id"`
 	LogID            string  `json:"log_id"`
 	ContestID        string  `json:"contest_id"`
 	QSOAt            string  `json:"qso_at"`
@@ -75,6 +77,7 @@ func NewLogEvent(log Log) LogEvent {
 	return LogEvent{
 		Type: LogEventType,
 		Data: LogPayload{
+			LogNumID:             log.LogNumID,
 			LogID:                log.LogID,
 			ContestID:            log.ContestID,
 			StationCall:          log.StationCall,
@@ -107,6 +110,7 @@ func NewQSOEvent(qso QSO) QSOEvent {
 		Type: QSOEventType,
 		Data: QSOPayload{
 			QSOID:            qso.QSOID,
+			LogNumID:         qso.LogNumID,
 			LogID:            qso.LogID,
 			ContestID:        qso.ContestID,
 			QSOAt:            formatTime(qso.QSOAt),

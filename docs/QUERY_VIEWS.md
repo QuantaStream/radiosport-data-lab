@@ -286,6 +286,94 @@ order by qso_at
 limit 30;
 ```
 
+## `contest_calibrated_spot_match_base`
+
+`contest_calibrated_spot_match_base` is the Tableau-facing surface for station
+performance. It starts from the best spot per QSO and exposes the raw signal,
+spotter profile fields, and precomputed normalized/weighted signal components.
+
+Create or refresh the view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_calibrated_spot_match_base.sql
+```
+
+Useful smoke query:
+
+```sql
+select
+  qso_hour,
+  band,
+  spotter_continent,
+  avg(raw_signal_db) as avg_snr,
+  avg(normalized_signal_db) as avg_normalized_snr,
+  sum(weighted_signal_db) / sum(spotter_weight) as calibrated_reach_snr,
+  count(*) as qsos
+from contest_calibrated_spot_match_base
+where station_call = 'TI8X'
+group by qso_hour, band, spotter_continent
+order by qso_hour, band, qsos desc
+limit 1000;
+```
+
+## `contest_competitiveness_qso_base`
+
+`contest_competitiveness_qso_base` is the Tableau-friendly surface for logged
+QSO volume. It wraps `contest_qso_propagation_base`, keeps one row per logged
+QSO, and exposes precomputed UTC date parts so worksheets can use plain columns
+instead of generated `DATEPART` SQL.
+
+Create or refresh the view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_competitiveness_qso_base.sql
+```
+
+Useful smoke query:
+
+```sql
+select
+  station_call,
+  band,
+  qso_hour,
+  count(*) as logged_qsos
+from contest_competitiveness_qso_base
+group by station_call, band, qso_hour
+order by station_call, band, qso_hour;
+```
+
+## `contest_competitiveness_signal_base`
+
+`contest_competitiveness_signal_base` is the Tableau-friendly surface for
+received-signal comparison. It wraps `contest_calibrated_spot_match_base`,
+keeps one row per best QSO/RBN match, aliases `spotter_continent` to
+`receiving_continent`, and exposes weighted-SNR components for Tableau
+calculated fields.
+
+Create or refresh the view:
+
+```bash
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_competitiveness_signal_base.sql
+```
+
+Useful smoke query:
+
+```sql
+select
+  station_call,
+  band,
+  avg(raw_signal_db) as avg_raw_snr,
+  avg(normalized_signal_db) as avg_normalized_snr,
+  sum(calibrated_reach_numerator) / sum(calibrated_reach_weight) as calibrated_reach_snr,
+  count(*) as matched_qsos
+from contest_competitiveness_signal_base
+group by station_call, band
+order by station_call, band;
+```
+
 ## `spotter_profile_base`
 
 `spotter_profile_base` is the current calibration surface for RBN receiving
@@ -361,10 +449,10 @@ group by spotter_continent, profile_quality
 order by spots desc;
 ```
 
-Use `spotter_weight` as the denominator weight for early weighted-SNR
-experiments. Runtime joins from match views to `spotter_profiles` are not the
-preferred QS path yet; materialize weighted match rows or add profile references
-to future match rows when the metric settles.
+Use `spotter_weight` as the denominator weight for calibrated-SNR experiments.
+Runtime joins from match views to `spotter_profiles` are not the preferred QS
+path yet; `contest-spot-match-load -spotter-profile-mysql-dsn ...`
+materializes the calibration fields into match rows.
 
 ## `station_activity_5m_base`
 
