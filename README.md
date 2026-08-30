@@ -1,21 +1,117 @@
 # RadioSport Data Lab
 
-RadioSport Data Lab is a small QuantaStream application playground for Reverse
-Beacon Network spot data. It starts from the old `rbn-to-kinesis` idea but keeps
-the new code plain: parse spots, normalize the event shape, enrich callsigns,
-and feed QuantaStream through either SQL inserts or the streaming loader.
+RadioSport Data Lab is a contest intelligence toolkit for amateur radio
+operators. It loads public contest logs, Reverse Beacon Network archives, SWPC
+space-weather data, and station metadata into QuantaStream so contesters can
+explain what happened, find missed opportunity, and plan the next event.
 
-## Current Shape
+The goal is not to require a BI product or an AI subscription. The toolkit
+should be useful from a terminal with repeatable commands and reports. Codex can
+then sit on top as an optional analysis partner: it can help choose workflows,
+compare stations, interpret query output, and turn the data into a practical
+contest plan.
 
-- `configuration/` contains the first QuantaStream table descriptors.
+## North Star
+
+Load your logs, public competitor logs, RBN archives, and solar data. Then use
+QuantaStream to understand where propagation, station capability, operator
+choices, and multiplier strategy shaped the result.
+
+The central questions are:
+
+- Where did I lose rate versus comparable stations?
+- Which openings did competitors exploit that I missed?
+- Was a weak band propagation-limited, antenna-limited, or underused?
+- Which multipliers were available but missed?
+- How broadly was my signal heard after spotter bias is calibrated?
+- What should my hour-by-hour plan look like for the next contest?
+
+## Usage Modes
+
+- **Manual mode:** clone the repo, run the loaders, install the views, and
+  generate reports from saved SQL/query packs.
+- **Guided mode:** use canned workflows and documented reports for common
+  contests, stations, competitors, and propagation questions.
+- **Codex mode:** ask richer questions in plain language and let Codex assemble
+  the workflow, inspect the results, and suggest next queries.
+
+Visualization is intentionally optional. Tableau, MySQL Workbench, CSV exports,
+and future static HTML charts are all output paths. The core product is the
+repeatable data pipeline and analysis model.
+
+## Recommended Workstation
+
+RadioSport Data Lab is written in Go and works best on a developer workstation
+with fast local storage and enough memory to load multi-day RBN archives. The
+reference setup is a modern laptop or desktop running Windows with WSL2/Ubuntu,
+Go installed inside Ubuntu, and QuantaStream running from the same Linux
+environment.
+
+A practical starting point is:
+
+- modern multi-core CPU
+- 32 GB RAM or more
+- SSD/NVMe storage with plenty of free space for archives and QS data
+- Windows 11 with WSL2/Ubuntu, or native Linux
+- Go installed when building from source
+
+Smaller machines can still run focused examples and single-day experiments.
+Large contest backfills, competitor comparisons, and RBN propagation studies
+benefit directly from more CPU, RAM, and disk bandwidth. On a laptop, prefer
+focused station filters and two-to-four-day RBN windows. Treat broad multi-week
+RBN sweeps as an AWS or offline-cache job until the loader and storage profile
+are hardened further.
+
+## License
+
+RadioSport Data Lab is released under the MIT License. QuantaStream itself is a
+separate project with its own license; this repository does not relicense
+QuantaStream.
+
+The repository should contain code, schemas, docs, SQL, and workflow scripts.
+Downloaded contest logs, RBN archives, QRZ-derived data, QuantaStream data
+directories, and generated reports belong in local runtime directories and
+should not be committed.
+
+NOAA/SWPC space-weather files are small public U.S. government datasets and may
+be committed as a convenience cache for reproducible examples. They can be
+refreshed with `cmd/swpc-load`.
+
+## Data Model
+
+The toolkit combines four evidence streams:
+
+- **Contest logs:** the submitted-log truth set for your station and comparable
+  competitors.
+- **RBN spots:** after-the-fact propagation evidence and signal observations.
+- **SWPC indices:** SFI/F10.7, A, K, and Kp context for contest and analog
+  propagation windows.
+- **Station metadata:** callsign/DXCC/continent/zone enrichment plus optional
+  spotter calibration profiles.
+
+QuantaStream is used because these workloads are naturally bitmap-shaped:
+time buckets, bands, prefixes, zones, continents, callsigns, and relationship
+joins over large event streams.
+
+## Repository Map
+
+Core schema and parsing:
+
+- `configuration/` contains the QuantaStream table descriptors.
 - `internal/callsign/` contains first-party CTY/DXCC callsign parsing.
 - `internal/rbn/` contains archive and telnet parsing primitives.
+
+Loaders and builders:
+
 - `cmd/rbn-inspect` profiles an RBN daily archive and verifies the parser.
+- `cmd/rbn-archive-scan` counts selected DX calls across staged RBN archives
+  before loading, which helps pick laptop-sized propagation windows.
 - `cmd/rbn-archive-to-jsonl` emits streaming-loader-ready JSONL from archives.
 - `cmd/rbn-archive-load` POSTs archive batches to a running `qstream-loader`.
 - `cmd/rbn-cache-build` builds focused parsed RBN day/callsign caches from
   archive files for repeatable contest matching.
-- `cmd/rbn-telnet-sql-ingest` batches live telnet spots into prepared SQL inserts.
+- `cmd/rbn-telnet-sql-ingest` batches live telnet spots into prepared SQL
+  inserts.
 - `cmd/rbn-update-cty` refreshes local CTY/DXCC data for telnet enrichment.
 - `cmd/rbn-qrz-lookup` fetches optional QRZ profiles and can cache them in SQL.
 - `cmd/swpc-load` parses NOAA SWPC solar/geomagnetic indices and emits loader
@@ -23,37 +119,52 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 - `cmd/cabrillo-load` parses public Cabrillo contest logs and emits
   `contest_logs`, `activity_5m_buckets`, and `contest_qsos` loader events.
 - `cmd/contest-spot-match-load` materializes QSO-to-RBN spot matches from a
-  Cabrillo log and matching RBN archive files.
+  Cabrillo log and matching RBN archive files, with optional spotter-profile
+  calibration fields for normalized signal analysis.
 - `cmd/spotter-profile-build` computes current RBN spotter calibration profiles
   from loaded spot data and emits loader events, including CTY-derived country
   centroid geo fields when `cty.dat` is available.
 - `cmd/station-activity-build` materializes five-minute station activity
   summaries for missed-opening and cohort analysis.
+
+Queries, views, and workflows:
+
 - `sql/views/` contains reusable analyst-facing views for QS SQL clients.
+- `sql/queries/contest_competitiveness_smoke.sql` contains repeatable
+  competitiveness smoke queries for MySQL CLI, Workbench, and visualization
+  checks.
 - `scripts/run-ti8x-contest-workflow.sh` runs the focused TI8X contest
   load/cache/match/view workflow, with optional competitor packs, against a
   running QS server and loader.
+- `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
+  distributed flat-loader benchmark and captures a tarball of evidence.
+
+Documentation:
+
 - `docs/SCHEMA_DESIGN.md` explains the mapper choices and ingestion plan.
 - `docs/INGESTION_PLAN.md` defines the shared payload for SQL and streaming.
+- `docs/RUNNING_LAB.md` is the local restart, health-check, and workflow
+  runbook.
+- `docs/QUERY_SAMPLER.md` contains copy/paste SQL for Workbench, Tableau, and
+  CLI exploration.
+- `docs/QUERY_VIEWS.md` documents reusable views and smoke queries.
+- `docs/SWPC_AND_CONTEST_PLAN.md` defines the historical space-weather and
+  Tier 1 Cabrillo contest-log expansion.
+- `docs/CQWW_SSB_2026_PLANNING.md` captures the first CQWW SSB 2026 planning
+  parameters: peer logs, SFI analog years, RBN propagation-window rules, and
+  report outputs.
+- `docs/SPOTTER_PROFILES_DESIGN.md` sketches spotter calibration, weighted SNR,
+  and reach-scoring tables/views.
+- `docs/MISSED_OPENINGS_DESIGN.md` sketches station activity summaries and
+  missed-opening analysis.
+- `docs/CONTEST_COMPETITIVENESS_ANALYSIS.md` explains the first
+  competitiveness views and worksheets.
 - `docs/ARCHIVE_PROFILE_20260821.md` records the 2026-08-21 sample profile.
 - `docs/LOADER_BENCHMARK_20260823.md` records the local flat-loader baseline.
 - `docs/CQWW_2025_STANDARD_BENCHMARK.md` records the two-day CQWW 2025
   standard-mode backfill and query pass.
 - `docs/TI8X_BUCKET_RELOAD_20260828.md` records the focused TI8X reload with
   five-minute activity buckets.
-- `docs/SWPC_AND_CONTEST_PLAN.md` defines the historical space-weather and
-  Tier 1 Cabrillo contest-log expansion.
-- `docs/SPOTTER_PROFILES_DESIGN.md` sketches spotter calibration, weighted SNR,
-  and reach-scoring tables/views.
-- `docs/MISSED_OPENINGS_DESIGN.md` sketches station activity summaries and
-  missed-opening analysis.
-- `docs/RUNNING_LAB.md` is the local restart, health-check, and workflow
-  runbook.
-- `docs/QUERY_SAMPLER.md` contains copy/paste SQL for Workbench, Tableau, and
-  CLI exploration.
-- `docs/QUERY_VIEWS.md` documents reusable views and smoke queries.
-- `scripts/run-aws-distributed-flat-loader-benchmark.sh` repeats the AWS
-  distributed flat-loader benchmark and captures a tarball of evidence.
 
 ## Data Sources
 
@@ -72,6 +183,7 @@ and feed QuantaStream through either SQL inserts or the streaming loader.
 ```bash
 go test ./...
 go run ./cmd/rbn-inspect /tmp/rbn-data/20260821.zip
+go run ./cmd/rbn-archive-scan -dx-calls TI8X,8P5A,V47T /tmp/rbn-data/2025*.zip
 go run ./cmd/rbn-archive-to-jsonl /tmp/rbn-data/20260821.zip > /tmp/rbn-spots.jsonl
 go run ./cmd/rbn-archive-load -target http://127.0.0.1:8088/ingest/json /tmp/rbn-data/20260821.zip
 go run ./cmd/rbn-cache-build -cache-dir /tmp/rbn-cache-ti8x -dx-call TI8X /tmp/rbn-data/20251129.zip /tmp/rbn-data/20251130.zip
@@ -79,7 +191,7 @@ go run ./cmd/rbn-telnet-sql-ingest -dry-run -limit 10
 go run ./cmd/rbn-update-cty
 go run ./cmd/swpc-load -from 2026-08-21 -to 2026-08-21 > /tmp/swpc-20260821.jsonl
 go run ./cmd/cabrillo-load -target "" https://cqww.com/publiclogs/2025cw/ti8x.log > /tmp/ti8x-contest.jsonl
-go run ./cmd/contest-spot-match-load -target "" -rbn-cache /tmp/rbn-cache-ti8x https://cqww.com/publiclogs/2025cw/ti8x.log 2025-11-29 2025-11-30 > /tmp/ti8x-matches.jsonl
+go run ./cmd/contest-spot-match-load -target "" -rbn-cache /tmp/rbn-cache-ti8x -spotter-profile-mysql-dsn 'qstream@tcp(127.0.0.1:4000)/quanta?parseTime=true' https://cqww.com/publiclogs/2025cw/ti8x.log 2025-11-29 2025-11-30 > /tmp/ti8x-matches.jsonl
 go run ./cmd/spotter-profile-build -target "" -from 2025-11-29 -to 2025-12-01 -cty-dat data/cty/cty.dat > /tmp/spotter-profiles.jsonl
 go run ./cmd/station-activity-build -target "" -from 2025-11-29 -to 2025-12-01 -dx-call TI8X > /tmp/station-activity.jsonl
 QRZ_USERNAME=... QRZ_PASSWORD=... go run ./cmd/rbn-qrz-lookup N7ZG
@@ -179,6 +291,12 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/contest_best_spot_match_base.sql
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_calibrated_spot_match_base.sql
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_competitiveness_qso_base.sql
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
+  < sql/views/contest_competitiveness_signal_base.sql
+mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/spotter_profile_base.sql
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
   < sql/views/station_activity_5m_base.sql
@@ -245,9 +363,16 @@ The script expects QuantaStream and `qstream-loader` to already be running with
 the RadioSport schema directory. It creates the required tables, truncates the
 workflow tables when `--reset` is passed, loads SWPC context, loads focused
 `spots_flat` rows, builds the parsed RBN cache, loads one or more Cabrillo logs,
-materializes exact matches for each log, builds spotter profiles and station
-activity summaries, installs the views, and writes logs plus verification output
-under `/tmp`.
+materializes exact matches for each log, builds station activity summaries,
+installs the views, and writes logs plus verification output under `/tmp`.
+Spotter profile calibration is opt-in with `RBN_PROFILE_BUILD=1` while its
+relationship key path is being hardened.
+
+Schema activation and reset go through the MySQL-compatible endpoint with
+`CREATE TABLE <name>` and `TRUNCATE TABLE <name>`. That keeps single-node and
+distributed runs aligned: start `quantastream` with `-config-dir
+./configuration`, or start `quantastream-proxy` with `-schema-dir
+./configuration`.
 
 Small competitor-pack reload:
 
