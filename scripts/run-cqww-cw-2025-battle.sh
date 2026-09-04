@@ -155,23 +155,29 @@ lock = {
 PY
 
 if [ -n "${CQWW_BATTLE_LOADER_URL:-}" ]; then
-  TIMELINE_JSONL="$output_dir/battle-timeline.jsonl" \
+  OUTPUT_DIR="$output_dir" \
   LOADER_URL="$CQWW_BATTLE_LOADER_URL" \
   python3 - <<'PY'
 import json
 import os
 import urllib.request
+from pathlib import Path
 
 url = os.environ["LOADER_URL"].rstrip("/") + "/ingest/json"
-events = [json.loads(line) for line in open(os.environ["TIMELINE_JSONL"], encoding="utf-8")]
-for start in range(0, len(events), 500):
-    payload = json.dumps({"events": events[start:start + 500]}).encode()
-    request = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        result = json.load(response)
-    if result.get("failed", 0) or result.get("accepted", 0) != len(events[start:start + 500]):
-        raise SystemExit(f"loader rejected timeline batch at {start}: {result}")
-print(f"loaded {len(events)} cqww_battle_bucket events")
+root = Path(os.environ["OUTPUT_DIR"])
+for path in (root / "battle-timeline.jsonl", root / "rbn-reach-region.jsonl"):
+    if not path.exists():
+        continue
+    events = [json.loads(line) for line in path.open(encoding="utf-8")]
+    for start in range(0, len(events), 500):
+        batch = events[start:start + 500]
+        payload = json.dumps({"events": batch}).encode()
+        request = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(request, timeout=60) as response:
+            result = json.load(response)
+        if result.get("failed", 0) or result.get("accepted", 0) != len(batch):
+            raise SystemExit(f"loader rejected {path.name} batch at {start}: {result}")
+    print(f"loaded {len(events)} events from {path.name}")
 PY
 fi
 

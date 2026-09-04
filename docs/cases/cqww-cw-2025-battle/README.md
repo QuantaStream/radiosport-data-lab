@@ -81,7 +81,11 @@ for independently reconstructing the scoring timeline.
 - `battle-timeline.csv`: aligned five-minute station state and lead margins;
 - `band-activity.csv`: activity, rate, points, and multipliers by band/time;
 - `rbn-reach.csv`: calibrated reception evidence by band, time, and region;
+- `rbn-reach-region.csv`: the same reduction split by receiver continent;
+- `rbn-reach-region.jsonl`: regional reach evidence in QuantaStream loader format;
 - `rbn-matched-skimmers.csv`: same-receiver EF8R/CQ9A SNR comparisons;
+- `rbn-high-band-daily.csv`: reproducible log/RBN day-level alignment;
+- `three-hour-checkpoints.csv`: score-race checkpoints for turning-point work;
 - `findings.md`: sourced claims with evidence classification and uncertainty;
 - a static, shareable report with links back to the underlying tables.
 
@@ -107,12 +111,13 @@ or local callsign exceptions. Both values and their delta are retained in
 `summaries.csv`; the claimed value is never used to alter the reconstruction.
 
 To load the timeline into an already running QuantaStream loader configured
-with this repository's `configuration` directory, create the
-`cqww_battle_buckets` table and set the loader base URL:
+with this repository's `configuration` directory, create the battle and RBN
+reach tables and set the loader base URL. If the RBN JSONL has already been
+generated, the same run loads both datasets:
 
 ```bash
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
-  -e 'create table cqww_battle_buckets'
+  -e 'create table cqww_battle_buckets; create table cqww_rbn_reach_buckets'
 CQWW_BATTLE_LOADER_URL=http://127.0.0.1:8088 \
   ./scripts/run-cqww-cw-2025-battle.sh
 mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
@@ -130,12 +135,15 @@ against [`rbn-source-lock.json`](rbn-source-lock.json), then run:
 
 ```bash
 go run ./cmd/cqww-rbn-report \
+  -band-activity /tmp/radiosport-cqww-cw-2025-battle/output/band-activity.csv \
   -output-dir /tmp/radiosport-cqww-cw-2025-battle/output \
   /path/to/20251129.zip /path/to/20251130.zip
 ```
 
 The reducer streams both archives once, retains exact-call observations for
-the three competitors, and writes `rbn-reach.csv` and
-`rbn-matched-skimmers.csv`. The latter compares EF8R and CQ9A only at the same
-receiver, band, and five-minute interval, with separate continent and all-
-receiver rows.
+the three competitors, and writes reach, regional reach, matched-skimmer, and
+daily high-band outputs. The regional JSONL can be loaded into
+`cqww_rbn_reach_buckets` by rerunning the battle workflow with
+`CQWW_BATTLE_LOADER_URL` set. The matched-skimmer output compares EF8R and CQ9A
+only at the same receiver, band, and five-minute interval, with separate
+continent and all-receiver rows.

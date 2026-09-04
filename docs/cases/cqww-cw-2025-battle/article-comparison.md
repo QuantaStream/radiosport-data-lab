@@ -107,6 +107,14 @@ interruptions. It does not establish their causes.
   problem therefore requires finer rate, interleaving, and RBN analysis rather
   than a simple outage test.
 
+RBN sharpens the interruption evidence. In EF8R's nominal 20-minute log gap,
+28 of 30 spots occur during 12:20--12:22, followed by only isolated decodes at
+12:29 and 12:32; broad decoding resumes at 12:40:36 on a new 10-meter
+frequency. That is consistent with roughly 18 minutes away from the radios.
+For 5J1DX, the entire two-hour no-QSO interval also contains zero exact-call
+RBN spots. RBN therefore supports RF inactivity during both events, while the
+operators' accounts remain the source for *why* they stopped.
+
 The machine-readable event ledger is [`operator-events.csv`](operator-events.csv).
 
 ## Initial matched-skimmer evidence
@@ -142,6 +150,48 @@ and region. Five-minute matching controls receiver identity, but not antenna
 direction, the exact seconds between observations, or whether both stations
 were CQing continuously.
 
+### The two days were different contests
+
+Joining `band-activity.csv` to the continent-level RBN reduction produces the
+following high-band split. A skimmer-bucket is one distinct receiver hearing a
+station in one five-minute interval, summed across 10 and 15 meters.
+
+| Day | Station | 10/15m QSOs | Active 5m intervals | Both high bands seen | EU skimmer-buckets | NA skimmer-buckets |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Saturday | EF8R | 4,225 | 164 | 112 | 4,253 | 2,130 |
+| Saturday | CQ9A | 3,696 | 166 | 126 | 4,743 | 2,435 |
+| Sunday | EF8R | 2,579 | 185 | 95 | 6,051 | 3,652 |
+| Sunday | CQ9A | 1,552 | 168 | 33 | 2,603 | 1,453 |
+
+On Saturday, EF8R produced 529 more high-band QSOs despite CQ9A having more
+RBN receiver/buckets and slightly more active intervals. This is evidence
+against attributing the first-day advantage to broader raw reach. On Sunday,
+EF8R added another 1,027-QSO advantage while appearing in 2.32 times as many
+European and 2.51 times as many North American skimmer-buckets. It was heard
+on both high bands within the same interval 95 times, versus only 33 for CQ9A.
+
+Thus 68.2 percent of EF8R's final 1,506-QSO high-band advantage accumulated on
+Sunday. The RBN evidence is consistent with much more sustained dual-high-band
+CQ presence that day. It does not by itself distinguish propagation, antenna
+choice, operator execution, or the effect of CQ9A's reported synchronization
+problem.
+
+## The online scoreboard was a spectator view, not telemetry
+
+The archived [scoreboard rate tool][scoreboard-rate] retains hourly charts,
+but reporting cadence creates artifacts. Its first-day EF8R/CQ9A chart has no
+values for hours 13 and 14, followed by apparent hour-15 QSO totals of 1,187
+and 982. The Cabrillo-derived hour-15 values are 351 and 330. The scoreboard
+values are consistent with several delayed uploads being assigned to one
+display interval, not either operator suddenly tripling the humanly plausible
+rate.
+
+Consequently, the scoreboard reliably documents the public ranking and final
+reported state, but its hourly bars cannot be substituted for QSO timestamps.
+This materially nuances the official article's description of watching the
+race unfold: spectators saw a compelling race, but not a uniformly sampled
+instrument trace.
+
 ## Comparison matrix
 
 | Question | Official article | 3830 accounts | Stage 1 logs | Stage 2 test |
@@ -176,3 +226,4 @@ were CQing continuously.
 [3830-ef8r]: https://3830scores.com/showrumor.php?arg=RvYizV7nJx07uU
 [3830-cq9a]: https://3830scores.com/showrumor.php?arg=RvYizV7nJxJx0U
 [3830-5j1dx]: https://3830scores.com/showrumor.php?arg=RvYizV7nJx07eU
+[scoreboard-rate]: https://contestonlinescore.com/tools/rate/?arc_contest_id=75&call=EF8R&call2=CQ9A

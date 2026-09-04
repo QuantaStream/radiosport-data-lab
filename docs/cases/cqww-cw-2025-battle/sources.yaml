@@ -43,6 +43,7 @@ sources:
     role: reproducible callsign-to-entity mapping immediately before the contest
   online_scoreboard:
     url: https://contestonlinescore.com/archive/?arc_contest_id=75
+    rate_url: https://contestonlinescore.com/tools/rate/?arc_contest_id=75
     role: live-reported score state and spectator view
   3830_claimed_scores:
     edition_url: https://3830scores.com/editionscores.php?arg=RvxuizV777Y0U

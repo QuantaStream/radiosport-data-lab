@@ -87,6 +87,9 @@ func main() {
 	if err := writeCheckpoints(filepath.Join(*outDir, "checkpoints.csv"), runs, start); err != nil {
 		fatalf("checkpoints: %v", err)
 	}
+	if err := writeThreeHourCheckpoints(filepath.Join(*outDir, "three-hour-checkpoints.csv"), runs, start); err != nil {
+		fatalf("three-hour checkpoints: %v", err)
+	}
 }
 
 func writeTimelineJSONL(path string, runs []stationRun) error {
@@ -208,8 +211,20 @@ func writeLeadChanges(path string, runs []stationRun) error {
 }
 
 func writeCheckpoints(path string, runs []stationRun, start time.Time) error {
+	return writeCheckpointHours(path, runs, start, []int{12, 24, 36, 48})
+}
+
+func writeThreeHourCheckpoints(path string, runs []stationRun, start time.Time) error {
+	hours := make([]int, 0, 16)
+	for hour := 3; hour <= 48; hour += 3 {
+		hours = append(hours, hour)
+	}
+	return writeCheckpointHours(path, runs, start, hours)
+}
+
+func writeCheckpointHours(path string, runs []stationRun, start time.Time, hoursList []int) error {
 	return writeCSV(path, []string{"elapsed_hours", "at", "rank", "station", "score", "score_behind", "qsos", "points", "countries", "zones", "multipliers"}, func(w *csv.Writer) error {
-		for _, hours := range []int{12, 24, 36, 48} {
+		for _, hours := range hoursList {
 			at := start.Add(time.Duration(hours) * time.Hour)
 			type entry struct {
 				call string

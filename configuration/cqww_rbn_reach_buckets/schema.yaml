@@ -1,0 +1,16 @@
+tableName: cqww_rbn_reach_buckets
+primaryKey: reach_id
+selector: type="cqww_rbn_reach_bucket"
+timeQuantumType: YMD
+timeQuantumField: bucket_start
+attributes:
+- {fieldName: reach_id, sourceName: /data/reach_id, mappingStrategy: IntBSI, type: Integer, columnID: true, sourceOrdinal: 1}
+- {fieldName: case_id, sourceName: /data/case_id, mappingStrategy: StringEnum, type: String, sourceOrdinal: 2}
+- {fieldName: bucket_start, sourceName: /data/bucket_start, mappingStrategy: TimestampBSI, configuration: {granularity: second}, type: DateTime, sourceOrdinal: 3}
+- {fieldName: station_call, sourceName: /data/station_call, mappingStrategy: StringLexBSI, configuration: {length: "8"}, type: String, maxLen: 16, sourceOrdinal: 4}
+- {fieldName: band, sourceName: /data/band, mappingStrategy: StringEnum, type: String, sourceOrdinal: 5}
+- {fieldName: spotter_continent, sourceName: /data/spotter_continent, mappingStrategy: StringEnum, type: String, sourceOrdinal: 6}
+- {fieldName: spot_count, sourceName: /data/spot_count, mappingStrategy: IntBSI, type: Integer, sourceOrdinal: 7}
+- {fieldName: unique_skimmers, sourceName: /data/unique_skimmers, mappingStrategy: IntBSI, type: Integer, sourceOrdinal: 8}
+- {fieldName: median_snr_millidb, sourceName: /data/median_snr_millidb, mappingStrategy: IntBSI, type: Integer, sourceOrdinal: 9}
+- {fieldName: p90_snr_millidb, sourceName: /data/p90_snr_millidb, mappingStrategy: IntBSI, type: Integer, sourceOrdinal: 10}

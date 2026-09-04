@@ -1,5 +1,17 @@
 -- CQ WW CW 2025 SOAB HP battle: reproducible QuantaStream queries.
 -- Load output/battle-timeline.jsonl into cqww_battle_buckets first.
+-- Load output/rbn-reach-region.jsonl into cqww_rbn_reach_buckets for RBN queries.
+
+-- Independent RBN reach by station, band, and receiving continent.
+select station_call,
+       band,
+       spotter_continent,
+       sum(spot_count) as spots,
+       sum(unique_skimmers) as skimmer_buckets
+from cqww_rbn_reach_buckets
+where case_id = 'cqww-cw-2025-soab-hp-battle'
+group by station_call, band, spotter_continent
+order by band, spotter_continent, station_call;
 
 -- Four-way checkpoint table. Run once for each documented timestamp.
 select

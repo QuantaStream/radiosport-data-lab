@@ -146,6 +146,79 @@ The safest conclusion is that each logging environment had its own multiplier
 interpretation. CTY-3537 is used here as a common analytical ruler, not as a
 claim about the precise country file installed at each station.
 
+## Stage 2: what the RBN adds
+
+The Reverse Beacon Network supplies independent receiver evidence: timestamped
+decodes from many skimmers, grouped into the same five-minute intervals as the
+logs. It cannot tell us operator intent or measure either station in a
+laboratory sense, but it can test whether a logged interruption coincides with
+an observable loss of RF and whether apparent reach differs by continent.
+
+### Finding 6: Saturday and Sunday were different races
+
+**Classification: derived from raw logs and RBN observations.** EF8R's final
+1,506-contact advantage on 10 and 15 meters was heavily back-loaded: 529 of
+those contacts came on Saturday and 1,027 on Sunday. Thus 68.2 percent of the
+high-band QSO advantage accumulated on the second day.
+
+| UTC day | Station | 10m + 15m QSOs | Active 5m intervals | Both high bands active | EU skimmer-buckets | NA skimmer-buckets |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Nov. 29 | EF8R | 4,225 | 164 | 112 | 4,253 | 2,130 |
+| Nov. 29 | CQ9A | 3,696 | 166 | 126 | 4,743 | 2,435 |
+| Nov. 30 | EF8R | 2,579 | 185 | 95 | 6,051 | 3,652 |
+| Nov. 30 | CQ9A | 1,552 | 168 | 33 | 2,603 | 1,453 |
+
+On Saturday CQ9A was decoded by more European and North American receivers and
+was active in slightly more five-minute intervals, yet EF8R completed 529 more
+high-band contacts. On Sunday EF8R combined a 1,027-contact production
+advantage with much broader observed reach: 2.32 times CQ9A's European
+skimmer-buckets and 2.51 times its North American total. EF8R also appeared on
+both 10 and 15 meters in 95 intervals versus CQ9A's 33. These observations do
+not isolate station design, propagation, or operating decisions, but they
+locate the decisive separation much more precisely than the final score does.
+
+### Finding 7: matched receivers complicate a simple signal-strength story
+
+**Classification: derived.** Comparing only skimmers that decoded both stations
+on the same band in the same five-minute interval reduces receiver and timing
+bias. On the high bands the geographic split mattered: CQ9A led the median
+matched comparison into Europe, while EF8R led into North America.
+
+| Band | Europe: EF8R minus CQ9A | North America: EF8R minus CQ9A |
+| --- | ---: | ---: |
+| 10m | -2.41 dB | +0.85 dB |
+| 15m | -1.72 dB | +2.05 dB |
+
+The unexpected result is that EF8R's QSO advantage is not explained by being
+uniformly louder everywhere. The evidence instead points toward a combination
+of geographic reach, sustained availability, and conversion of openings into
+contacts.
+
+### Finding 8: the two major log gaps have independent RF corroboration
+
+**Classification: corroborated, not causal.** EF8R logged no QSOs from 12:20
+through 12:39 UTC Sunday. RBN has 30 exact-call spots in the nominal interval,
+but 28 occur during its first two minutes; only isolated decodes appear at
+12:29 and 12:32. Broad decoding resumes at 12:40:36 on a new 10-meter
+frequency. This is consistent with roughly 18 minutes of RF cessation, while
+not identifying its cause. CQ9A gained about 164,000 reconstructed points over
+the same 20-minute interval.
+
+5J1DX's two-hour log gap from 09:05 to 11:05 UTC Sunday is even cleaner: there
+are no exact-call RBN spots during the entire interval. CQ9A made 473 contacts
+and 1,389 QSO points during it, widening the reconstructed gap by roughly
+850,000 points.
+
+### Finding 9: the archived scoreboard is a spectator record, not telemetry
+
+**Classification: publicly observed and compared with logs.** The archived
+rate chart omits intermediate values around hours 13 and 14 and then displays
+an apparent hour-15 surge of about 1,187 QSOs for EF8R and 982 for CQ9A. Their
+Cabrillo logs contain 351 and 330 contacts in that hour. The mismatch is a
+clear delayed-upload batching artifact. The scoreboard preserves what viewers
+saw, but its hour-to-hour shape should not be used as a station-rate trace.
+[Archived rate comparison](https://contestonlinescore.com/tools/rate/?arc_contest_id=75&call=EF8R&call2=CQ9A)
+
 ## Checked results: context, not reconstructed adjudication
 
 The official results were EF8R 26,516,025, CQ9A 23,779,792, and 5J1DX
@@ -169,10 +242,13 @@ therefore reported only as aggregate context.
   an operator is uncertain of a previous QSO.
 - Lead changes are reconstructed at five-minute resolution and may move
   slightly under another valid multiplier map.
-- No RBN signal, propagation, audio, or station-performance inference is part
-  of Stage 1.
-- Online-score history is not required. Only its archived end value is used to
-  document the CQ9A raw-score inconsistency.
+- RBN spot counts depend on the participating receiver population. A
+  skimmer-bucket is one distinct receiver in one five-minute interval, not a
+  calibrated coverage-area measurement.
+- Matched-receiver SNR reduces important biases but does not eliminate antenna,
+  path, frequency, fading, or transmit-cycle differences.
+- The archived scoreboard has delayed-upload artifacts and is used only as a
+  record of the public viewing experience.
 
 ## Reproduce it
 
@@ -184,11 +260,12 @@ From the RadioSport Data Lab repository:
 
 The workflow verifies every downloaded input against the committed lock and
 writes `summaries.csv`, `score-timeline.csv`, `band-activity.csv`,
-`lead-changes.csv`, and `checkpoints.csv`. See the case-study `README.md` for
+`lead-changes.csv`, `checkpoints.csv`, and `three-hour-checkpoints.csv`. The RBN
+workflow adds reach, matched-receiver, daily high-band, and QuantaStream JSONL
+outputs. See the case-study `README.md` for
 paths and environment overrides.
 
 The point of the exercise is not that an AI can summarize a scoreboard. Codex
 helped turn public evidence into testable questions and trace discrepancies;
 RadioSport Data Lab made the workflow repeatable; and QuantaStream provides the
-analytical foundation for extending the same model to millions of RBN
-observations in the next stage.
+analytical foundation for querying the same evidence model at larger scale.
