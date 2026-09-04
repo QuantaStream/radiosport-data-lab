@@ -27,6 +27,8 @@ func TestParseCommonCallsigns(t *testing.T) {
 		{call: "W3LPL/5", prefix: "W", primary: "K", continent: "NA", country: "United States"},
 		{call: "UA9MAT/1", prefix: "UA9", primary: "UA9", continent: "AS", country: "Asiatic Russia"},
 		{call: "8J3XVIII", prefix: "8J", primary: "JA", continent: "AS", country: "Japan"},
+		{call: "8J2025XYZ", prefix: "8J", primary: "JA", continent: "AS", country: "Japan"},
+		{call: "UR5ZEP/A", prefix: "UR", primary: "UR", continent: "EU", country: "Ukraine"},
 		{call: "GW8IZR-#", prefix: "GW", primary: "G", continent: "EU", country: "England"},
 	}
 	for _, tt := range tests {

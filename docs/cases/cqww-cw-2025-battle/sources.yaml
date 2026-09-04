@@ -1,0 +1,60 @@
+case_id: cqww-cw-2025-soab-hp-battle
+contest:
+  name: CQ World Wide DX CW Contest
+  starts_at: 2025-11-29T00:00:00Z
+  ends_at: 2025-12-01T00:00:00Z
+stations:
+  - call: EF8R
+    operator: N6MJ
+    location: Canary Islands
+    public_log: https://cqww.com/publiclogs/2025cw/ef8r.log
+    expected_submitted_qsos: 12991
+    expected_claimed_score: 27582918
+    expected_final_qsos: 12552
+    expected_final_score: 26516025
+  - call: CQ9A
+    operator: KL9A
+    location: Madeira
+    public_log: https://cqww.com/publiclogs/2025cw/cq9a.log
+    expected_submitted_qsos: 11520
+    expected_claimed_score: 24689392
+    expected_final_qsos: 11219
+    expected_final_score: 23779792
+  - call: 5J1DX
+    operator: E77DX
+    location: Colombia
+    public_log: https://cqww.com/publiclogs/2025cw/5j1dx.log
+    expected_submitted_qsos: 9833
+    expected_claimed_score: 18024600
+    expected_final_qsos: 9005
+    expected_final_score: 16738525
+sources:
+  official_results:
+    url: https://cqww.com/results/2025_cq_ww_dx_cw_results.pdf
+    role: final standings, checked totals, rates, and contest narrative
+  official_rules:
+    url: https://cqww.com/rules/2025_rules_cqww.pdf
+    role: scoring and category authority
+  contest_country_file:
+    release: CTY-3537
+    published_at: 2025-11-25
+    url: https://www.country-files.com/cty/download/3537/cty-3537.zip
+    member: cqww.dat
+    role: reproducible callsign-to-entity mapping immediately before the contest
+  online_scoreboard:
+    url: https://contestonlinescore.com/archive/?arc_contest_id=75
+    role: live-reported score state and spectator view
+  rbn_history:
+    url: https://data.reversebeacon.net/rbn_history/
+    files:
+      - 20251129.zip
+      - 20251130.zip
+    role: independent frequency, time, signal, and receiver observations
+  swpc:
+    role: solar and geomagnetic context loaded by cmd/swpc-load
+  q5_ef8r_debrief:
+    url: https://q5hamradio.substack.com/p/ef8r-contest-audio-cq-ww-cw-2025
+    role: operator account requiring independent corroboration where possible
+  df7ee_recap:
+    url: https://df7ee.de/cq-ww-cw-2025/
+    role: contemporary spectator account of the three-way online-score race

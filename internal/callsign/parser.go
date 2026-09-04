@@ -59,8 +59,8 @@ var (
 	reGetCQZone        = regexp.MustCompile(`[(]([0-9]+)[)]`)
 	reGetITUZone       = regexp.MustCompile(`[[]([0-9]+)[]]`)
 	reHasThreeChars    = regexp.MustCompile(`(?i)[/A-Z0-9\-]{3,16}`)
-	reLeadingNumber    = regexp.MustCompile(`(?i)^[0-9][A-Z]{1,2}?([0-9])[A-Z]+$`)
-	reLeadingAlpha     = regexp.MustCompile(`(?i)^[A-Z]{1,2}?([0-9]{1,4})[A-Z]+$`)
+	reLeadingNumber    = regexp.MustCompile(`(?i)^[0-9][A-Z]{1,2}?([0-9])[A-Z0-9]+$`)
+	reLeadingAlpha     = regexp.MustCompile(`(?i)^[A-Z]{1,2}?([0-9]{1,4})[A-Z0-9]+$`)
 	reRemoveDashSuffix = regexp.MustCompile(`(?i)-[0-9#-]{1,4}$`)
 )
 
@@ -334,7 +334,7 @@ func (st *Station) checkDesignator(s string) bool {
 	case "BCN", "B":
 		st.Beacon = true
 		return true
-	case "LH", "M", "P", "QRP", "QRPP":
+	case "A", "LH", "M", "P", "QRP", "QRPP":
 		return true
 	default:
 		return false

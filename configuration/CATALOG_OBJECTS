@@ -64,3 +64,8 @@ objects:
   object_type: TABLE
   creation_date: 2026-08-29T00:00:00Z
   modification_date: 2026-08-29T00:00:00Z
+- schema_name: quanta
+  table_name: cqww_battle_buckets
+  object_type: TABLE
+  creation_date: 2026-09-04T00:00:00Z
+  modification_date: 2026-09-04T00:00:00Z

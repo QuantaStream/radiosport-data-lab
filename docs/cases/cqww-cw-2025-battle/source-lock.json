@@ -1,0 +1,42 @@
+{
+  "case_id": "cqww-cw-2025-soab-hp-battle",
+  "locked_at": "2026-09-04T16:32:52Z",
+  "sources": [
+    {
+      "name": "ef8r.log",
+      "url": "https://cqww.com/publiclogs/2025cw/ef8r.log",
+      "bytes": 1183210,
+      "sha256": "fbc5f55879d91ca3b19b692071ad1e75e14f8dcf1d39e51b1d2bcc105c81f53a"
+    },
+    {
+      "name": "cq9a.log",
+      "url": "https://cqww.com/publiclogs/2025cw/cq9a.log",
+      "bytes": 1048712,
+      "sha256": "1f1e2f1b87f555e64cdcd53904926c58e61d5c23875b8efca9fa9ad59b13fa04"
+    },
+    {
+      "name": "5j1dx.log",
+      "url": "https://cqww.com/publiclogs/2025cw/5j1dx.log",
+      "bytes": 895301,
+      "sha256": "f2def50f2f44a367f3417cb24e8f2aba0e0b4cbe044f0bfb10c776886f80c338"
+    },
+    {
+      "name": "cty-3537.zip",
+      "url": "https://www.country-files.com/cty/download/3537/cty-3537.zip",
+      "bytes": 1377501,
+      "sha256": "3deb16e17a5787cc6e0c4aa20d4deeed1c8b5c84efe2f15712d7af72b2bdf29a"
+    },
+    {
+      "name": "2025_rules_cqww.pdf",
+      "url": "https://cqww.com/rules/2025_rules_cqww.pdf",
+      "bytes": 115327,
+      "sha256": "baca797dd37cb1ac334037de70b119f666172341639b742d156345b88ce92bca"
+    },
+    {
+      "name": "2025_cq_ww_dx_cw_results.pdf",
+      "url": "https://cqww.com/results/2025_cq_ww_dx_cw_results.pdf",
+      "bytes": 2200357,
+      "sha256": "08898a71810c3417b23988da9238068d7275e874878eac64f7ae75d6fa0ad2fb"
+    }
+  ]
+}
