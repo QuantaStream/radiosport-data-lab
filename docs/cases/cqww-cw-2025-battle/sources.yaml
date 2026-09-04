@@ -44,6 +44,15 @@ sources:
   online_scoreboard:
     url: https://contestonlinescore.com/archive/?arc_contest_id=75
     role: live-reported score state and spectator view
+  3830_claimed_scores:
+    edition_url: https://3830scores.com/editionscores.php?arg=RvxuizV777Y0U
+    breakdown_url: https://3830scores.com/breakdownscores.php?arg=RvxuizV777Y0U
+    comments_url: https://3830scores.com/editioncomments.php?arg=RvxuizV777Y0U
+    entries:
+      EF8R: https://3830scores.com/showrumor.php?arg=RvYizV7nJx07uU
+      CQ9A: https://3830scores.com/showrumor.php?arg=RvYizV7nJxJx0U
+      5J1DX: https://3830scores.com/showrumor.php?arg=RvYizV7nJx07eU
+    role: contemporaneous operator-reported scores, band totals, rates, and accounts
   rbn_history:
     url: https://data.reversebeacon.net/rbn_history/
     files:

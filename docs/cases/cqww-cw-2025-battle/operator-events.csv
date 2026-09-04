@@ -1,0 +1,5 @@
+event_id,station,reported_start,reported_end,observed_start,observed_end,reported_duration_minutes,observed_zero_qso_minutes,source,reported_cause,log_status
+ef8r_fatigue_break,EF8R,2025-11-30T09:00:00Z,2025-11-30T12:59:59Z,2025-11-30T12:20:00Z,2025-11-30T12:40:00Z,20,20,https://3830scores.com/showrumor.php?arg=RvYizV7nJx07uU,fatigue and shower,corroborated timing only
+cq9a_keyboard_sync,CQ9A,2025-11-29T00:00:00Z,2025-11-30T16:00:00Z,,,0,0,https://3830scores.com/showrumor.php?arg=RvYizV7nJxJx0U,keyboard log-window and CW synchronization,requires finer analysis
+5j1dx_pc_power,5J1DX,2025-11-29T02:00:00Z,2025-11-29T02:59:59Z,,,,,https://3830scores.com/showrumor.php?arg=RvYizV7nJx07eU,PC power connector interruption,requires finer analysis
+5j1dx_amplifier_break,5J1DX,2025-11-30T00:00:00Z,2025-11-30T11:59:59Z,2025-11-30T09:05:00Z,2025-11-30T11:05:00Z,105,120,https://3830scores.com/showrumor.php?arg=RvYizV7nJx07eU,repeated amplifier shutdowns and operator reset,corroborated timing only

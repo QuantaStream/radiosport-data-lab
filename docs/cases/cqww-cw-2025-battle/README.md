@@ -4,7 +4,10 @@ This case study reconstructs the 48-hour CQ World Wide DX CW contest battle
 among Dan Craig, N6MJ, operating EF8R; Chris Hurlbut, KL9A, operating CQ9A;
 and Emir "Braco" Memic, E77DX, operating 5J1DX.
 
-Read the community-facing result in [`findings.md`](findings.md).
+Read the community-facing result in [`findings.md`](findings.md). Stage 2
+begins in [`article-comparison.md`](article-comparison.md), which separates the
+official results article's claims from the contemporaneous 3830 accounts and
+lists the log/RBN tests needed to corroborate the latter.
 
 The objective is to produce a reproducible, evidence-backed account of how the
 contest developed, not merely a visualization of the final standings. The
