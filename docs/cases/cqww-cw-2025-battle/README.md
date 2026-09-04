@@ -81,6 +81,7 @@ for independently reconstructing the scoring timeline.
 - `battle-timeline.csv`: aligned five-minute station state and lead margins;
 - `band-activity.csv`: activity, rate, points, and multipliers by band/time;
 - `rbn-reach.csv`: calibrated reception evidence by band, time, and region;
+- `rbn-matched-skimmers.csv`: same-receiver EF8R/CQ9A SNR comparisons;
 - `findings.md`: sourced claims with evidence classification and uncertainty;
 - a static, shareable report with links back to the underlying tables.
 
@@ -120,3 +121,21 @@ mysql -h 127.0.0.1 -P 4000 -u qstream -D quanta \
 
 The optional upload is deliberately off by default, keeping the normal
 workflow reproducible without requiring a running database.
+
+## Reduce the RBN archives
+
+Download the official `20251129.zip` and `20251130.zip` daily archives from
+the [RBN raw-data page](https://www.reversebeacon.net/raw_data/), verify them
+against [`rbn-source-lock.json`](rbn-source-lock.json), then run:
+
+```bash
+go run ./cmd/cqww-rbn-report \
+  -output-dir /tmp/radiosport-cqww-cw-2025-battle/output \
+  /path/to/20251129.zip /path/to/20251130.zip
+```
+
+The reducer streams both archives once, retains exact-call observations for
+the three competitors, and writes `rbn-reach.csv` and
+`rbn-matched-skimmers.csv`. The latter compares EF8R and CQ9A only at the same
+receiver, band, and five-minute interval, with separate continent and all-
+receiver rows.

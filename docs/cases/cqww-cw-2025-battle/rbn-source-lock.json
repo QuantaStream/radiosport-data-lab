@@ -1,0 +1,18 @@
+{
+  "case_id": "cqww-cw-2025-soab-hp-battle",
+  "locked_at": "2026-09-04T19:23:39Z",
+  "sources": [
+    {
+      "name": "20251129.zip",
+      "url": "https://data.reversebeacon.net/rbn_history/20251129.zip",
+      "bytes": 66850492,
+      "sha256": "69bb3e247376dcd4a446cb84af888edf0730296da8bef1ff151c9e249998d3e8"
+    },
+    {
+      "name": "20251130.zip",
+      "url": "https://data.reversebeacon.net/rbn_history/20251130.zip",
+      "bytes": 71204720,
+      "sha256": "444d1dcb938e0ff969761a64e6e946199f79377a3e64d8e48aab04242758ff80"
+    }
+  ]
+}

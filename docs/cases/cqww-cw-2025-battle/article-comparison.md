@@ -109,6 +109,39 @@ interruptions. It does not establish their causes.
 
 The machine-readable event ledger is [`operator-events.csv`](operator-events.csv).
 
+## Initial matched-skimmer evidence
+
+The two official RBN daily archives contain 84,810 exact-call spots for the
+three stations: 37,805 EF8R, 40,319 CQ9A, and 6,686 5J1DX. Raw totals are not a
+signal-strength ranking because CQ frequency, operating style, and the uneven
+skimmer network all affect spot counts.
+
+`cqww-rbn-report` therefore compares EF8R and CQ9A only when the same skimmer
+heard both on the same band within the same five-minute bucket. Each station's
+spots are averaged within that receiver/bucket before taking the difference.
+The initial weekend-wide results are:
+
+| Band | Matched receiver/buckets | Mean EF8R minus CQ9A SNR |
+| --- | ---: | ---: |
+| 160m | 14 | -2.21 dB |
+| 80m | 1,336 | -1.83 dB |
+| 40m | 3,085 | -1.58 dB |
+| 20m | 1,002 | +2.43 dB |
+| 15m | 2,294 | -0.12 dB |
+| 10m | 1,248 | -1.39 dB |
+
+This **does not support a simple "EF8R was louder on the high bands"
+explanation** for its decisive 10/15-meter QSO advantage. On 10 meters CQ9A
+was 2.41 dB stronger at matched European receivers while EF8R was 0.85 dB
+stronger at matched North American receivers. On 15 meters those differences
+were 1.72 dB toward CQ9A in Europe and 2.05 dB toward EF8R in North America.
+
+That geographic split is a derived observation, not yet a causal result. The
+next test must align reach, CQ frequency occupancy, and log production by time
+and region. Five-minute matching controls receiver identity, but not antenna
+direction, the exact seconds between observations, or whether both stations
+were CQing continuously.
+
 ## Comparison matrix
 
 | Question | Official article | 3830 accounts | Stage 1 logs | Stage 2 test |
@@ -133,7 +166,7 @@ The machine-readable event ledger is [`operator-events.csv`](operator-events.csv
 ## Next reproducible outputs
 
 1. five-minute QSO and score deltas around each reported event;
-2. RBN reach by station, band, region, and matched skimmer;
+2. align RBN reach with log production and reported events;
 3. live-score versus reconstructed score, if snapshots can be acquired; and
 4. a claim ledger classifying statements as confirmed, nuanced, untestable,
    contradicted, or newly derived.
